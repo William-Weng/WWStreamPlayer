@@ -96,8 +96,8 @@
     
     AVFormatContext *formatContext = NULL;
     
-    int result = [self openLocalInputWithContext:&formatContext url:url];
-    if (result < 0) { return nil; }
+    NSError *error = [self checkStreamInputWithURL:url formatContext:&formatContext parameters:nil];
+    if (error) { return nil; }
     
     int videoStreamIndex = [self videoStreamIndexWithFormatContext:formatContext];
     if (videoStreamIndex < 0) { avformat_close_input(&formatContext); return nil; }
@@ -237,17 +237,12 @@
             @"stimeout": @"5_000_000",
         };
         
-        int result = [this openRemoteInputWithContext:&formatContext parameters:parameters url:url];
-        
-        if (result < 0) {
-            errorCallback([this errorMessageResult:result code:FFmpegVideoErrorOpenFailed]);
-            return;
-        }
+        NSError *error = [self checkStreamInputWithURL:url formatContext:&formatContext parameters:parameters];
+        if (error) { avformat_close_input(&formatContext); errorCallback(error); return; }
         
         int videoStreamIndex = [this videoStreamIndexWithFormatContext:formatContext];
-        
         if (videoStreamIndex < 0) {
-            errorCallback([this errorMessageResult:result code:FFmpegVideoErrorStreamInfoFailed]);
+            errorCallback([this errorMessage:nil code:FFmpegVideoErrorStreamInfoFailed]);
             avformat_close_input(&formatContext);
             return;
         }
@@ -316,13 +311,8 @@
             @"stimeout": @"5_000_000"
         };
         
-        int result = [this openRemoteInputWithContext:&formatContext parameters:parameters url:url];
-        
-        if (result < 0) {
-            errorCallback([this errorMessageResult:result code:FFmpegVideoErrorOpenFailed]);
-            avformat_close_input(&formatContext);
-            return;
-        }
+        NSError *error = [self checkStreamInputWithURL:url formatContext:&formatContext parameters:parameters];
+        if (error) { avformat_close_input(&formatContext); errorCallback(error); return; }
         
         int videoStreamIndex = [this videoStreamIndexWithFormatContext:formatContext];
         if (videoStreamIndex < 0) { avformat_close_input(&formatContext); return; }
@@ -340,7 +330,7 @@
         AVFrame *frame = av_frame_alloc();
         
         FFmpegDstBuffer dstBuffer = {0};
-        result = av_image_alloc(dstBuffer.data, dstBuffer.linesize, codecContext->width, codecContext->height, pixelFormat, 1);
+        int result = av_image_alloc(dstBuffer.data, dstBuffer.linesize, codecContext->width, codecContext->height, pixelFormat, 1);
         
         if (result < 0) {
             errorCallback([this errorMessageResult:result code:FFmpegVideoErrorImageAllocFailed]);
@@ -442,13 +432,8 @@
             @"stimeout": @"5_000_000"
         };
         
-        int result = [this openRemoteInputWithContext:&formatContext parameters:parameters url:url];
-        
-        if (result < 0) {
-            errorCallback([this errorMessageResult:result code:FFmpegVideoErrorOpenFailed]);
-            avformat_close_input(&formatContext);
-            return;
-        }
+        NSError *error = [self checkStreamInputWithURL:url formatContext:&formatContext parameters:parameters];
+        if (error) { avformat_close_input(&formatContext); errorCallback(error); return; }
         
         int videoStreamIndex = [this videoStreamIndexWithFormatContext:formatContext];
         if (videoStreamIndex < 0) { avformat_close_input(&formatContext); return; }
@@ -461,12 +446,12 @@
         
         enum AVPixelFormat pixelFormat = AV_PIX_FMT_BGRA;
         struct SwsContext *swsContext = [this softwareScalerContextWithCodecContext:codecContext outputFormat:pixelFormat scalerFlags:SWS_BILINEAR];
-
+        
         AVPacket *packet = av_packet_alloc();
         AVFrame  *frame  = av_frame_alloc();
         
         FFmpegDstBuffer dstBuffer = {0};
-        result = av_image_alloc(dstBuffer.data, dstBuffer.linesize, codecContext->width, codecContext->height, pixelFormat, 1);
+        int result = av_image_alloc(dstBuffer.data, dstBuffer.linesize, codecContext->width, codecContext->height, pixelFormat, 1);
         
         if (result < 0) {
             errorCallback([this errorMessageResult:result code:FFmpegVideoErrorImageAllocFailed]);
@@ -596,9 +581,6 @@
 /// - Parameter formatContext: AVFormatContext
 - (int)videoStreamIndexWithFormatContext:(AVFormatContext *)formatContext {
     
-    int result = [self findStreamInformationWithContext:formatContext];
-    if (result < 0) { return -1; }
-    
     for (int index = 0; index < formatContext->nb_streams; index++) {
         
         AVStream *stream = formatContext->streams[index];
@@ -611,7 +593,7 @@
 }
 
 // MARK: - 小工具 (FFMpeg)
-/// 測試影片路徑是否正確
+/// 測試影片路徑是否正確 (能不能打開 / 讀不讀得到)
 /// - Parameters:
 ///   - url: NSURL
 ///   - formatContext: AVFormatContext
@@ -681,16 +663,7 @@
     return sws_getContext(codecContext->width, codecContext->height, srcFmt, codecContext->width, codecContext->height, dstFormat, scalerFlags, NULL, NULL, NULL);
 }
 
-/// 開啟檔案 (本地端)
-/// - Parameters:
-///   - formatContext: AVFormatContext
-///   - url: NSURL
-- (int)openLocalInputWithContext:(AVFormatContext**)formatContext url:(NSURL*)url {
-    int result = avformat_open_input(formatContext, [[url path] UTF8String], NULL, NULL);
-    return result;
-}
-
-/// 開啟檔案 (遠端)
+/// 開啟檔案
 /// - Parameters:
 ///   - formatContext: AVFormatContext
 ///   - parameters: NSDictionary
