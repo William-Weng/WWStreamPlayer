@@ -14,7 +14,8 @@ let package = Package(
     targets: [
         .target(
             name: "WWStreamPlayer",
-            dependencies: ["FFmpegWrapper"]
+            dependencies: ["FFmpegWrapper"],
+            resources: [.copy("Privacy")]
         ),
         .target(
             name: "FFmpegWrapper",

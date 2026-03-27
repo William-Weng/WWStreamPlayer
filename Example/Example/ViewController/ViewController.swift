@@ -18,8 +18,8 @@ final class ViewController: UIViewController {
     private let rtsp = "rtsp://localhost:8554/mystream"
     private let displayLayer = AVSampleBufferDisplayLayer()
     
-    override func viewDidLoad() {
-        super.viewDidLoad()
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
         initSetting()
     }
     
@@ -34,8 +34,11 @@ private extension ViewController {
     
     /// 初始化設定
     func initSetting() {
+        
         displayLayer.frame = layerImageView.bounds
         displayLayer.videoGravity = .resizeAspect
+        displayLayer.isOpaque = true;
+        
         layerImageView.layer.addSublayer(displayLayer)
         ffmepgVersion()
     }

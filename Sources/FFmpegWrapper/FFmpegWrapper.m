@@ -78,21 +78,8 @@
     AVFormatContext *formatContext = NULL;
     NSDictionary<NSString *, NSString *> *parameters = @{ @"rtsp_transport": @"tcp" };
     
-    int result = [self openRemoteInputWithContext:&formatContext parameters:parameters url:url];
-    
-    if (result < 0) {
-        if (error) { *error = [self errorMessageResult:result code:FFmpegVideoErrorOpenFailed]; }
-        avformat_close_input(&formatContext);
-        return 0;
-    }
-
-    result = [self findStreamInformationWithContext:formatContext];
-    
-    if (result < 0) {
-        if (error) { *error = [self errorMessageResult:result code:FFmpegVideoErrorStreamInfoFailed]; }
-        avformat_close_input(&formatContext);
-        return 0;
-    }
+    *error = [self checkStreamInputWithURL:url formatContext:&formatContext parameters:parameters];
+    if (*error) { avformat_close_input(formatContext); return 0; }
     
     int64_t duration = formatContext->duration;
     avformat_close_input(&formatContext);
@@ -222,6 +209,85 @@
 }
 
 // MARK: - 小工具
+/// 取得RTSP串流畫面
+/// - Parameters:
+///   - url: NSURL
+///   - frameCallback: 返回畫面
+///   - errorCallback: 返回錯誤
+///   - completionCallback: 播放完成
+- (void)getFrameRTSPWithURL:(NSURL *)url frame:(void (^)(UIImage *frame))frameCallback error:(void (^)(NSError *error))errorCallback completion:(void (^)(BOOL isFinished))completionCallback {
+    
+    if (!url) { return; }
+    if (!errorCallback) { return; }
+    if (!frameCallback) { return; }
+    
+    self.rtspShouldStop = false;
+    
+    __weak typeof(self) weakSelf = self;
+    
+    dispatch_async(self.rtspQueue, ^{
+        
+        __strong typeof(self) this = weakSelf;
+        if (!this) { return; }
+        
+        AVFormatContext *formatContext = NULL;
+        
+        NSDictionary<NSString *, NSString *> *parameters = @{
+            @"rtsp_transport": @"tcp",
+            @"stimeout": @"5_000_000",
+        };
+        
+        int result = [this openRemoteInputWithContext:&formatContext parameters:parameters url:url];
+        
+        if (result < 0) {
+            errorCallback([this errorMessageResult:result code:FFmpegVideoErrorOpenFailed]);
+            return;
+        }
+        
+        int videoStreamIndex = [this videoStreamIndexWithFormatContext:formatContext];
+        
+        if (videoStreamIndex < 0) {
+            errorCallback([this errorMessageResult:result code:FFmpegVideoErrorStreamInfoFailed]);
+            avformat_close_input(&formatContext);
+            return;
+        }
+        
+        AVStream *stream = formatContext->streams[videoStreamIndex];
+        AVCodecParameters *parameter = stream->codecpar;
+        const AVCodec *codec = avcodec_find_decoder(parameter->codec_id);
+        AVCodecContext *codecContext = avcodec_alloc_context3(codec);
+        avcodec_parameters_to_context(codecContext, parameter);
+        avcodec_open2(codecContext, codec, NULL);
+        
+        AVPacket *packet = av_packet_alloc();
+        AVFrame *frame = av_frame_alloc();
+        
+        while (!this.rtspShouldStop && av_read_frame(formatContext, packet) >= 0) {
+            
+            if (packet->stream_index != videoStreamIndex) { av_packet_unref(packet); continue; }
+            
+            avcodec_send_packet(codecContext, packet);
+            
+            while (avcodec_receive_frame(codecContext, frame) == 0) {
+                @autoreleasepool {
+                    UIImage *image = [self yuvToImage:frame];
+                    frameCallback(image);
+                    av_frame_unref(frame);
+                }
+            }
+            
+            av_packet_unref(packet);
+        }
+        
+        av_frame_free(&frame);
+        av_packet_free(&packet);
+        avcodec_free_context(&codecContext);
+        avformat_close_input(&formatContext);
+        
+        completionCallback(true);
+    });
+}
+
 /// 播放RTSP串流 => 使用AVSampleBufferDisplayLayer
 /// - Parameters:
 ///   - url: NSURL
@@ -235,9 +301,6 @@
 
     self.rtspLayerShouldStop = NO;
     self.currentDisplayLayer = displayLayer;
-    
-    displayLayer.videoGravity = AVLayerVideoGravityResizeAspect;
-    displayLayer.opaque = YES;
     
     __weak typeof(self) weakSelf = self;
     
@@ -547,86 +610,23 @@
     return -1;
 }
 
-/// 取得RTSP串流畫面
+// MARK: - 小工具 (FFMpeg)
+/// 測試影片路徑是否正確
 /// - Parameters:
 ///   - url: NSURL
-///   - frameCallback: 返回畫面
-///   - errorCallback: 返回錯誤
-///   - completionCallback: 播放完成
-- (void)getFrameRTSPWithURL:(NSURL *)url frame:(void (^)(UIImage *frame))frameCallback error:(void (^)(NSError *error))errorCallback completion:(void (^)(BOOL isFinished))completionCallback {
+///   - formatContext: AVFormatContext
+///   - parameters: NSDictionary*
+- (NSError *)checkStreamInputWithURL:(NSURL *)url formatContext:(AVFormatContext **)formatContext parameters:(NSDictionary<NSString *, NSString *> *)parameters {
     
-    if (!url) { return; }
-    if (!errorCallback) { return; }
-    if (!frameCallback) { return; }
+    int result = [self openRemoteInputWithContext:formatContext parameters:parameters url:url];
+    if (result < 0) { return [self errorMessageResult:result code:FFmpegVideoErrorOpenFailed]; }
     
-    self.rtspShouldStop = false;
+    result = [self findStreamInformationWithContext:*formatContext];
+    if (result < 0) { return [self errorMessageResult:result code:FFmpegVideoErrorStreamInfoFailed]; }
     
-    __weak typeof(self) weakSelf = self;
-    
-    dispatch_async(self.rtspQueue, ^{
-        
-        __strong typeof(self) this = weakSelf;
-        if (!this) { return; }
-        
-        AVFormatContext *formatContext = NULL;
-        
-        NSDictionary<NSString *, NSString *> *parameters = @{
-            @"rtsp_transport": @"tcp",
-            @"stimeout": @"5_000_000",
-        };
-        
-        int result = [this openRemoteInputWithContext:&formatContext parameters:parameters url:url];
-        
-        if (result < 0) {
-            errorCallback([this errorMessageResult:result code:FFmpegVideoErrorOpenFailed]);
-            return;
-        }
-        
-        int videoStreamIndex = [this videoStreamIndexWithFormatContext:formatContext];
-        
-        if (videoStreamIndex < 0) {
-            errorCallback([this errorMessageResult:result code:FFmpegVideoErrorStreamInfoFailed]);
-            avformat_close_input(&formatContext);
-            return;
-        }
-        
-        AVStream *stream = formatContext->streams[videoStreamIndex];
-        AVCodecParameters *parameter = stream->codecpar;
-        const AVCodec *codec = avcodec_find_decoder(parameter->codec_id);
-        AVCodecContext *codecContext = avcodec_alloc_context3(codec);
-        avcodec_parameters_to_context(codecContext, parameter);
-        avcodec_open2(codecContext, codec, NULL);
-        
-        AVPacket *packet = av_packet_alloc();
-        AVFrame *frame = av_frame_alloc();
-        
-        while (!this.rtspShouldStop && av_read_frame(formatContext, packet) >= 0) {
-            
-            if (packet->stream_index != videoStreamIndex) { av_packet_unref(packet); continue; }
-            
-            avcodec_send_packet(codecContext, packet);
-            
-            while (avcodec_receive_frame(codecContext, frame) == 0) {
-                @autoreleasepool {
-                    UIImage *image = [self yuvToImage:frame];
-                    frameCallback(image);
-                    av_frame_unref(frame);
-                }
-            }
-            
-            av_packet_unref(packet);
-        }
-        
-        av_frame_free(&frame);
-        av_packet_free(&packet);
-        avcodec_free_context(&codecContext);
-        avformat_close_input(&formatContext);
-        
-        completionCallback(true);
-    });
+    return nil;
 }
 
-// MARK: - 小工具 (FFMpeg)
 /// 將AVFrame => UIImage (bytesPerRow要對齊16的倍數值)
 /// - Parameter frame: AVFrame
 - (UIImage *)yuvToImage:(AVFrame *)frame {
