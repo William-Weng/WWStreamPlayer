@@ -6,7 +6,7 @@
 - [Use FFMpeg to play RSTP streaming videos.](https://www.youtube.com/watch?v=aJrI_g2qDOQ)
 - [使用FFMpeg來播放RSTP串流影片。](https://william-weng.github.io/2026/03/ffmpeg跟ios終於在一起了/)
 
-https://github.com/user-attachments/assets/012d1cf0-6626-40e3-b39c-d60e4dd745b8
+https://github.com/user-attachments/assets/fd3cc4bf-4d98-4dda-b3c3-9a57cf9b0bc8
 
 ### [Installation with Swift Package Manager](https://medium.com/彼得潘的-swift-ios-app-開發問題解答集/使用-spm-安裝第三方套件-xcode-11-新功能-2c4ffcf85b4b)
 ```bash
