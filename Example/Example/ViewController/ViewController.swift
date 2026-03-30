@@ -12,6 +12,8 @@ import WWStreamPlayer
 final class ViewController: UIViewController {
 
     @IBOutlet weak var ffmpegVersionLabel: UILabel!
+    @IBOutlet weak var videoTimeLabel: UILabel!
+    @IBOutlet weak var layerTimeLabel: UILabel!
     @IBOutlet weak var videoImageView: UIImageView!
     @IBOutlet weak var layerImageView: UIImageView!
 
@@ -52,14 +54,27 @@ private extension ViewController {
     /// 播放串流 (圖片)
     /// - Parameter urlString: String
     func playRtspSteam(at urlString: String) {
+        
         guard let url = URL(string: urlString) else { return }
-        WWStreamPlayer.shared.play(at: url) { image in self.videoImageView.image = image }
+        
+        WWStreamPlayer.shared.stop(for: .image)
+
+        WWStreamPlayer.shared.play(at: url) { image, elapseTime in
+            self.videoTimeLabel.text = "\(CMTimeGetSeconds(elapseTime))"
+            self.videoImageView.image = image
+        }
     }
     
     /// 播放串流 (AVSampleBufferDisplayLayer)
     /// - Parameter urlString: String
     func playRtspSteam2(at urlString: String) {
+        
         guard let url = URL(string: urlString) else { return }
-        WWStreamPlayer.shared.play(at: url, displayLayer: displayLayer)
+        
+        WWStreamPlayer.shared.stop(for: .displayLayer)
+        
+        WWStreamPlayer.shared.play(at: url, displayLayer: displayLayer, elapseTime: { elapseTime in
+            self.layerTimeLabel.text = "\(CMTimeGetSeconds(elapseTime))"
+        })
     }
 }

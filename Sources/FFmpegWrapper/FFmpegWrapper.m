@@ -144,13 +144,13 @@
 /// 播放RTSP串流 => 使用frame圖片
 /// - Parameters:
 ///   - url: NSURL
-///   - frameCallback: 返回畫面
+///   - frameCallback: 返回畫面 + 時間
 ///   - errorCallback: 返回錯誤
 ///   - completionCallback: 播放完成
-- (void)playRTSPWithURL:(NSURL *)url frame:(void (^)(UIImage *frame))frameCallback error:(void (^)(NSError *error))errorCallback  completion:(void (^)(BOOL isFinished))completionCallback {
+- (void)playRTSPWithURL:(NSURL *)url frame:(FFmpegFrameWithTimeCallback)frameCallback error:(void (^)(NSError *error))errorCallback  completion:(void (^)(BOOL isFinished))completionCallback {
     
-    [self getFrameRTSPWithURL:url frame:^(UIImage *frame) {
-        if (frame) { dispatch_async(dispatch_get_main_queue(), ^{ frameCallback(frame); });}
+    [self getFrameRTSPWithURL:url frame:^(UIImage * _Nonnull frame, CMTime timestamp) {
+        dispatch_async(dispatch_get_main_queue(), ^{ frameCallback(frame, timestamp); });
     } error:^(NSError *error) {
         errorCallback(error);
     } completion:^(BOOL isFinished) {
@@ -162,11 +162,14 @@
 /// - Parameters:
 ///   - url: NSURL
 ///   - displayLayer: AVSampleBufferDisplayLayer
+///   - timeCallback: 時間
 ///   - errorCallback: 返回錯誤
 ///   - completionCallback: 播放完成
-- (void)playRTSPWithURL:(NSURL *)url displayLayer:(AVSampleBufferDisplayLayer *)displayLayer error:(void (^)(NSError *error))errorCallback completion:(void (^)(BOOL isFinished))completionCallback {
+- (void)playRTSPWithURL:(NSURL *)url displayLayer:(AVSampleBufferDisplayLayer *)displayLayer timeStamp:(void (^)(CMTime time))timeCallback error:(void (^)(NSError *error))errorCallback completion:(void (^)(BOOL isFinished))completionCallback {
     
-    [self startRTSPPlayWithURL:url displayLayer:displayLayer error:^(NSError * _Nonnull error) {
+    [self startRTSPPlayWithURL:url displayLayer:displayLayer timeStamp:^(CMTime time) {
+        dispatch_async(dispatch_get_main_queue(), ^{ timeCallback(time); });
+    } error:^(NSError *error) {
         errorCallback(error);
     } completion:^(BOOL isFinished) {
         completionCallback(isFinished);
@@ -176,13 +179,13 @@
 /// 播放RTSP串流 => 使用CVPixelBuffer
 /// - Parameters:
 ///   - url: NSURL
-///   - pixelBufferCallback: 返回CVPixelBufferRef
+///   - pixelBufferCallback: 返回CVPixelBuffer + 時間
 ///   - errorCallback: 返回錯誤
 ///   - completionCallback: 播放完成
 - (void)playRTSPWithURL:(NSURL *)url pixelBuffer:(FFmpegPixelBufferCallback)pixelBufferCallback error:(void (^)(NSError *error))errorCallback completion:(void (^)(BOOL isFinished))completionCallback {
     
-    [self startRTSPPlayWithURL:url pixelBufferCallback:^(CVPixelBufferRef  _Nonnull pixelBuffer) {
-        pixelBufferCallback(pixelBuffer);
+    [self startRTSPPlayWithURL:url pixelBufferCallback:^(CVPixelBufferRef  _Nonnull pixelBuffer, CMTime timeStamp) {
+        pixelBufferCallback(pixelBuffer, timeStamp);
     } error:^(NSError * _Nonnull error) {
         errorCallback(error);
     } completion:^(BOOL isFinished) {
@@ -215,7 +218,7 @@
 ///   - frameCallback: 返回畫面
 ///   - errorCallback: 返回錯誤
 ///   - completionCallback: 播放完成
-- (void)getFrameRTSPWithURL:(NSURL *)url frame:(void (^)(UIImage *frame))frameCallback error:(void (^)(NSError *error))errorCallback completion:(void (^)(BOOL isFinished))completionCallback {
+- (void)getFrameRTSPWithURL:(NSURL *)url frame:(FFmpegFrameWithTimeCallback)frameCallback error:(void (^)(NSError *error))errorCallback completion:(void (^)(BOOL isFinished))completionCallback {
     
     if (!url) { return; }
     if (!errorCallback) { return; }
@@ -241,13 +244,15 @@
         if (error) { avformat_close_input(&formatContext); errorCallback(error); return; }
         
         int videoStreamIndex = [this videoStreamIndexWithFormatContext:formatContext];
+        
         if (videoStreamIndex < 0) {
             errorCallback([this errorMessage:nil code:FFmpegVideoErrorStreamInfoFailed]);
             avformat_close_input(&formatContext);
             return;
         }
         
-        AVCodecContext *codecContext = [this createCodecContextForStreamAtIndex:videoStreamIndex formatContext: formatContext];
+        AVStream *stream = formatContext->streams[videoStreamIndex];
+        AVCodecContext *codecContext = [this createCodecContextForStream:stream formatContext: formatContext];
         if (codecContext == NULL) { return; }
         
         AVPacket *packet = av_packet_alloc();
@@ -261,9 +266,11 @@
             avcodec_send_packet(codecContext, packet);
             
             while (avcodec_receive_frame(codecContext, frame) == 0) {
+                
                 @autoreleasepool {
+                    CMTime timeStamp = [this timeFromFrame:frame stream:stream];
                     UIImage *image = [self yuvToImage:frame];
-                    frameCallback(image);
+                    frameCallback(image, timeStamp);
                     av_frame_unref(frame);
                 }
             }
@@ -313,8 +320,9 @@
         
         int videoStreamIndex = [this videoStreamIndexWithFormatContext:formatContext];
         if (videoStreamIndex < 0) { avformat_close_input(&formatContext); return; }
-                
-        AVCodecContext *codecContext = [this createCodecContextForStreamAtIndex:videoStreamIndex formatContext: formatContext];
+        
+        AVStream* stream = formatContext->streams[videoStreamIndex];
+        AVCodecContext *codecContext = [this createCodecContextForStream:stream formatContext: formatContext];
         if (codecContext == NULL) { return; }
         
         enum AVPixelFormat pixelFormat = AV_PIX_FMT_BGRA;
@@ -359,7 +367,8 @@
                     CFRetain(pixelBuffer);
                     
                     dispatch_async(dispatch_get_main_queue(), ^{
-                        callback(pixelBuffer);
+                        CMTime timeStamp = [this timeFromFrame:frame stream:stream];
+                        callback(pixelBuffer, timeStamp);
                         CFRelease(pixelBuffer);
                     });
                 }
@@ -386,7 +395,7 @@
 ///   - errorCallback: 返回錯誤
 ///   - frameCallback: 返回畫面
 ///   - completionCallback: 播放完成
-- (void)startRTSPPlayWithURL:(NSURL *)url displayLayer:(AVSampleBufferDisplayLayer *)displayLayer error:(void (^)(NSError *error))errorCallback completion:(void (^)(BOOL isFinished))completionCallback {
+- (void)startRTSPPlayWithURL:(NSURL *)url displayLayer:(AVSampleBufferDisplayLayer *)displayLayer timeStamp:(void (^)(CMTime time))timeCallback error:(void (^)(NSError *error))errorCallback completion:(void (^)(BOOL isFinished))completionCallback {
     
     if (!url) { return; }
     if (!displayLayer) { return; }
@@ -418,7 +427,8 @@
             return;
         }
         
-        AVCodecContext *codecContext = [this createCodecContextForStreamAtIndex:videoStreamIndex formatContext: formatContext];
+        AVStream* stream = formatContext->streams[videoStreamIndex];
+        AVCodecContext *codecContext = [this createCodecContextForStream:stream formatContext: formatContext];
         if (codecContext == NULL) { return; }
         
         enum AVPixelFormat pixelFormat = AV_PIX_FMT_BGRA;
@@ -436,7 +446,7 @@
             return;
         }
         
-        AVRational timeBase = formatContext->streams[videoStreamIndex]->time_base;
+        AVRational timeBase = stream->time_base;
         
         while (av_read_frame(formatContext, packet) >= 0) {
             
@@ -457,12 +467,14 @@
                 if (!pixelBuffer) { continue; }
                 
                 [this copyDestinationBuffer:dstBuffer to:pixelBuffer codecContext:codecContext];
-                
-                CMTime timeStamp = CMTimeMake(frame->best_effort_timestamp * timeBase.num, timeBase.den);
+                                
+                CMTime timeStamp = [this timeFromFrame:frame stream:stream];
                 CMSampleBufferRef sampleBuffer = NULL;
                 
                 OSStatus status = [this convertPixelBuffer:pixelBuffer to:&sampleBuffer time:timeStamp];
                 CVPixelBufferRelease(pixelBuffer);
+                
+                timeCallback(timeStamp);
                 
                 if (status != noErr) { continue; }
                 if (!sampleBuffer) { continue; }
@@ -681,15 +693,36 @@
     return result;
 }
 
+/// 取得影片時間 (CMTime)
+/// - Parameters:
+///   - frame: AVFrame
+///   - stream: AVStream
+- (CMTime)timeFromFrame:(AVFrame *)frame stream:(AVStream *)stream {
+    
+    // CMTime timeStamp = CMTimeMake(frame->best_effort_timestamp * timeBase.num, timeBase.den);
+    
+    AVRational timeBase = stream->time_base;
+    int64_t bestTimestamp = frame->best_effort_timestamp;
+    CMTime timeStamp = CMTimeMake(bestTimestamp * timeBase.num, timeBase.den);
+    
+    return timeStamp;
+}
+
+/// 取得影片時間 (Second)
+/// - Parameters:
+///   - frame: AVFrame
+///   - stream: AVFrame
+- (NSTimeInterval)secondFromFrame:(AVFrame *)frame stream:(AVFrame *)stream {
+    CMTime time = [self timeFromFrame:frame stream:stream];
+    return  CMTimeGetSeconds(time);
+}
+
 /// 根據指定的串流的Index及已開啟的 AVFormatContext，建立並開啟對應串流的 AVCodecContext
 /// - Parameters:
-///   - streamIndex: NSInteger
+///   - stream: AVStream
 ///   - formatContext: AVFormatContext
-- (AVCodecContext *)createCodecContextForStreamAtIndex:(NSInteger)streamIndex formatContext:(AVFormatContext *)formatContext {
+- (AVCodecContext *)createCodecContextForStream:(AVStream *)stream formatContext:(AVFormatContext *)formatContext {
     
-    if (streamIndex < 0 || streamIndex >= formatContext->nb_streams) { return NULL; }
-
-    AVStream *stream = formatContext->streams[streamIndex];
     AVCodecParameters *par = stream->codecpar;
 
     const AVCodec *codec = avcodec_find_decoder(par->codec_id);
@@ -710,7 +743,6 @@
     
     return codecContext;
 }
-
 
 /// 設定AVDictionary
 /// - Parameter parameters: NSDictionary *

@@ -11,7 +11,7 @@ https://github.com/user-attachments/assets/fd3cc4bf-4d98-4dda-b3c3-9a57cf9b0bc8
 ### [Installation with Swift Package Manager](https://medium.com/彼得潘的-swift-ios-app-開發問題解答集/使用-spm-安裝第三方套件-xcode-11-新功能-2c4ffcf85b4b)
 ```bash
 dependencies: [
-    .package(url: "https://github.com/William-Weng/WWStreamPlayer.git", .upToNextMajor(from: "0.5.0"))
+    .package(url: "https://github.com/William-Weng/WWStreamPlayer.git", .upToNextMajor(from: "0.5.2"))
 ]
 ```
 
@@ -23,7 +23,7 @@ dependencies: [
 |frame(at:second:)|取得本地端影音該時段的畫面|
 |thumbnails(at:count:)|產生本地端影音縮圖 (平均時間)|
 |play(at:frame:failure:completion:)|播放RTSP串流 (使用frame圖片)|
-|play(at:displayLayer:failure:completion:)|播放RTSP串流 (使用AVSampleBufferDisplayLayer)|
+|play(at:displayLayer:elapseTime:failure:completion:)|播放RTSP串流 (使用AVSampleBufferDisplayLayer)|
 |play(at:pixelBuffer:failure:completion:)|播放RTSP串流 (使用CVPixelBuffer for MetalKit)|
 |stop(for:)|停止播放|
 
@@ -36,9 +36,11 @@ import WWStreamPlayer
 final class ViewController: UIViewController {
 
     @IBOutlet weak var ffmpegVersionLabel: UILabel!
+    @IBOutlet weak var videoTimeLabel: UILabel!
+    @IBOutlet weak var layerTimeLabel: UILabel!
     @IBOutlet weak var videoImageView: UIImageView!
     @IBOutlet weak var layerImageView: UIImageView!
-    
+
     private let rtsp = "rtsp://localhost:8554/mystream"
     private let displayLayer = AVSampleBufferDisplayLayer()
     
@@ -54,27 +56,32 @@ final class ViewController: UIViewController {
 }
 
 private extension ViewController {
-
+    
     func initSetting() {
+        
         displayLayer.frame = layerImageView.bounds
         displayLayer.videoGravity = .resizeAspect
+        displayLayer.isOpaque = true;
+        
         layerImageView.layer.addSublayer(displayLayer)
         ffmepgVersion()
     }
-
+    
     func ffmepgVersion() {
         let version = WWStreamPlayer.shared.ffmpegVersion()
         ffmpegVersionLabel.text = "FFMpeg: \(version)"
     }
-
+    
     func playRtspSteam(at urlString: String) {
+        
         guard let url = URL(string: urlString) else { return }
-        WWStreamPlayer.shared.play(at: url) { image in self.videoImageView.image = image }
-    }
+        
+        WWStreamPlayer.shared.stop(for: .image)
 
-    func playRtspSteam2(at urlString: String) {
-        guard let url = URL(string: urlString) else { return }
-        WWStreamPlayer.shared.play(at: url, displayLayer: displayLayer)
+        WWStreamPlayer.shared.play(at: url) { image, elapseTime in
+            self.videoTimeLabel.text = "\(CMTimeGetSeconds(elapseTime))"
+            self.videoImageView.image = image
+        }
     }
 }
 ```

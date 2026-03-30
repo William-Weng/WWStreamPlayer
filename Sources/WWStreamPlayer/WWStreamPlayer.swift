@@ -61,13 +61,13 @@ public extension WWStreamPlayer {
     /// 播放RTSP串流 (使用frame圖片)
     /// - Parameters:
     ///   - url: NSURL
-    ///   - frameCallback: 返回畫面
+    ///   - frameCallback: 返回畫面 + 時間
     ///   - failureCallback: 返回錯誤
     ///   - completionCallback: 播放完成
-    func play(at url: URL, frame frameCallback: @escaping ((UIImage) -> Void), failure failureCallback: ((Error) -> Void)? = nil, completion completionCallback: ((Bool) -> Void)? = nil) {
+    func play(at url: URL, frame frameCallback: @escaping FFmpegFrameWithTimeCallback, failure failureCallback: ((Error) -> Void)? = nil, completion completionCallback: ((Bool) -> Void)? = nil) {
         
-        FFmpegWrapper.shared().playRTSP(with: url) { frame in
-            frameCallback(frame)
+        FFmpegWrapper.shared().playRTSP(with: url) { frame, timestamp  in
+            frameCallback(frame, timestamp)
         } error: { error in
             failureCallback?(error)
         } completion: { isFinished in
@@ -79,11 +79,14 @@ public extension WWStreamPlayer {
     /// - Parameters:
     ///   - url: NSURL
     ///   - displayLayer: AVSampleBufferDisplayLayer
+    ///   - elapseCallback: 時間
     ///   - failureCallback: 返回錯誤
     ///   - completionCallback: 播放完成
-    func play(at url: URL, displayLayer: AVSampleBufferDisplayLayer, failure failureCallback: ((Error) -> Void)? = nil, completion completionCallback: ((Bool) -> Void)? = nil) {
+    func play(at url: URL, displayLayer: AVSampleBufferDisplayLayer, elapseTime elapseCallback: ((CMTime) -> Void)? = nil, failure failureCallback: ((Error) -> Void)? = nil, completion completionCallback: ((Bool) -> Void)? = nil) {
         
-        FFmpegWrapper.shared().playRTSP(with: url, displayLayer: displayLayer) { error in
+        FFmpegWrapper.shared().playRTSP(with: url, displayLayer: displayLayer) { time in
+            elapseCallback?(time)
+        } error: { error in
             failureCallback?(error)
         } completion: { isFinished in
             completionCallback?(isFinished)
