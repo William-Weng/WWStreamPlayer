@@ -283,127 +283,6 @@
     });
 }
 
-/// 播放RTSP串流 => 使用AVSampleBufferDisplayLayer
-/// - Parameters:
-///   - url: NSURL
-///   - errorCallback: 返回錯誤
-///   - frameCallback: 返回畫面
-///   - completionCallback: 播放完成
-- (void)startRTSPPlayWithURL:(NSURL *)url displayLayer:(AVSampleBufferDisplayLayer *)displayLayer error:(void (^)(NSError *error))errorCallback completion:(void (^)(BOOL isFinished))completionCallback {
-    
-    if (!url) { return; }
-    if (!displayLayer) { return; }
-
-    self.rtspLayerShouldStop = NO;
-    self.currentDisplayLayer = displayLayer;
-    
-    __weak typeof(self) weakSelf = self;
-    
-    dispatch_async(self.rtspLayerQueue, ^{
-        
-        __strong typeof(self) this = weakSelf;
-        if (!this) { return; }
-        
-        AVFormatContext *formatContext = NULL;
-        
-        NSDictionary<NSString *, NSString *> *parameters = @{
-            @"rtsp_transport": @"tcp",
-            @"stimeout": @"5_000_000"
-        };
-        
-        NSError *error = [self checkStreamInputWithURL:url formatContext:&formatContext parameters:parameters];
-        if (error) { avformat_close_input(&formatContext); errorCallback(error); return; }
-        
-        int videoStreamIndex = [this videoStreamIndexWithFormatContext:formatContext];
-        if (videoStreamIndex < 0) { avformat_close_input(&formatContext); return; }
-        
-        AVCodecParameters *codecpar = formatContext->streams[videoStreamIndex]->codecpar;
-        const AVCodec *codec = avcodec_find_decoder(codecpar->codec_id);
-        AVCodecContext *codecContext = avcodec_alloc_context3(codec);
-        avcodec_parameters_to_context(codecContext, codecpar);
-        avcodec_open2(codecContext, codec, NULL);
-        
-        enum AVPixelFormat pixelFormat = AV_PIX_FMT_BGRA;
-        struct SwsContext *swsContext = [this softwareScalerContextWithCodecContext:codecContext outputFormat:pixelFormat scalerFlags:SWS_BILINEAR];
-        
-        AVPacket *packet = av_packet_alloc();
-        AVFrame *frame = av_frame_alloc();
-        
-        FFmpegDstBuffer dstBuffer = {0};
-        int result = av_image_alloc(dstBuffer.data, dstBuffer.linesize, codecContext->width, codecContext->height, pixelFormat, 1);
-        
-        if (result < 0) {
-            errorCallback([this errorMessageResult:result code:FFmpegVideoErrorImageAllocFailed]);
-            av_freep(&dstBuffer.data[0]);
-            return;
-        }
-        
-        AVRational timeBase = formatContext->streams[videoStreamIndex]->time_base;
-        
-        while (!this.rtspLayerShouldStop && av_read_frame(formatContext, packet) >= 0) {
-            
-            if (packet->stream_index != videoStreamIndex) { av_packet_unref(packet); continue; }
-            
-            avcodec_send_packet(codecContext, packet);
-            
-            while (avcodec_receive_frame(codecContext, frame) == 0) {
-                
-                FFmpegSrcBuffer srcBuf = [this prepareSwsSrcFromFrame:frame];
-                sws_scale(swsContext, (const uint8_t * const *)srcBuf.slice, srcBuf.stride, 0, codecContext->height, dstBuffer.data, dstBuffer.linesize);
-                
-                CVPixelBufferRef pixelBuffer = NULL;
-                CVReturn cvReturn = [this createPixelBuffer: &pixelBuffer codecContext:codecContext];
-                
-                if (cvReturn != kCVReturnSuccess) { continue; }
-                if (!pixelBuffer) { continue; }
-                                
-                [this copyDestinationBuffer:dstBuffer to:pixelBuffer codecContext:codecContext];
-                
-                CMTime timeStamp = CMTimeMake(frame->best_effort_timestamp * timeBase.num, timeBase.den);
-                CMSampleBufferRef sampleBuffer = NULL;
-                
-                OSStatus status = [this convertPixelBuffer:pixelBuffer to:&sampleBuffer time:timeStamp];
-                CVPixelBufferRelease(pixelBuffer);
-                
-                if (status != noErr) { continue; }
-                if (!sampleBuffer) { continue; }
-                
-                AVSampleBufferDisplayLayer *displayLayer = this.currentDisplayLayer;
-                
-                if (displayLayer) {
-                    
-                    CFRetain(sampleBuffer);
-                    
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        
-                        if (self.rtspLayerShouldStop) { CFRelease(sampleBuffer); return; }
-                        AVSampleBufferDisplayLayer *strongLayer = this.currentDisplayLayer;
-                        
-                        if (!strongLayer) { CFRelease(sampleBuffer); return; }
-                        if (strongLayer.status == AVQueuedSampleBufferRenderingStatusFailed) { [strongLayer flushAndRemoveImage]; }
-                        if (strongLayer.isReadyForMoreMediaData) { [strongLayer enqueueSampleBuffer:sampleBuffer]; }
-                        
-                        CFRelease(sampleBuffer);
-                    });
-                }
-                
-                CFRelease(sampleBuffer);
-            }
-            
-            av_packet_unref(packet);
-        }
-        
-        av_freep(&dstBuffer.data[0]);
-        sws_freeContext(swsContext);
-        av_frame_free(&frame);
-        av_packet_free(&packet);
-        avcodec_free_context(&codecContext);
-        avformat_close_input(&formatContext);
-        
-        completionCallback(true);
-    });
-}
-
 /// 播放RTSP串流 => 使用CVPixelBuffer
 /// - Parameters:
 ///   - url: NSURL
@@ -437,18 +316,14 @@
         
         int videoStreamIndex = [this videoStreamIndexWithFormatContext:formatContext];
         if (videoStreamIndex < 0) { avformat_close_input(&formatContext); return; }
-        
-        AVCodecParameters *codecpar = formatContext->streams[videoStreamIndex]->codecpar;
-        const AVCodec *codec = avcodec_find_decoder(codecpar->codec_id);
-        AVCodecContext *codecContext = avcodec_alloc_context3(codec);
-        avcodec_parameters_to_context(codecContext, codecpar);
-        avcodec_open2(codecContext, codec, NULL);
+                
+        AVCodecContext *codecContext = [this createCodecContextForStreamAtIndex:videoStreamIndex formatContext: formatContext];
         
         enum AVPixelFormat pixelFormat = AV_PIX_FMT_BGRA;
         struct SwsContext *swsContext = [this softwareScalerContextWithCodecContext:codecContext outputFormat:pixelFormat scalerFlags:SWS_BILINEAR];
         
         AVPacket *packet = av_packet_alloc();
-        AVFrame  *frame  = av_frame_alloc();
+        AVFrame *frame = av_frame_alloc();
         
         FFmpegDstBuffer dstBuffer = {0};
         int result = av_image_alloc(dstBuffer.data, dstBuffer.linesize, codecContext->width, codecContext->height, pixelFormat, 1);
@@ -459,8 +334,9 @@
             return;
         }
         
-        while (!self.rtspPixelShouldStop && av_read_frame(formatContext, packet) >= 0) {
+        while (av_read_frame(formatContext, packet) >= 0) {
             
+            if (this.rtspPixelShouldStop) { return; }
             if (packet->stream_index != videoStreamIndex) { av_packet_unref(packet); continue; }
             
             avcodec_send_packet(codecContext, packet);
@@ -492,6 +368,128 @@
                 
                 CVPixelBufferRelease(pixelBuffer);
             }
+            av_packet_unref(packet);
+        }
+        
+        av_freep(&dstBuffer.data[0]);
+        sws_freeContext(swsContext);
+        av_frame_free(&frame);
+        av_packet_free(&packet);
+        avcodec_free_context(&codecContext);
+        avformat_close_input(&formatContext);
+        
+        completionCallback(true);
+    });
+}
+
+/// 播放RTSP串流 => 使用AVSampleBufferDisplayLayer
+/// - Parameters:
+///   - url: NSURL
+///   - errorCallback: 返回錯誤
+///   - frameCallback: 返回畫面
+///   - completionCallback: 播放完成
+- (void)startRTSPPlayWithURL:(NSURL *)url displayLayer:(AVSampleBufferDisplayLayer *)displayLayer error:(void (^)(NSError *error))errorCallback completion:(void (^)(BOOL isFinished))completionCallback {
+    
+    if (!url) { return; }
+    if (!displayLayer) { return; }
+
+    self.rtspLayerShouldStop = NO;
+    self.currentDisplayLayer = displayLayer;
+    
+    __weak typeof(self) weakSelf = self;
+    
+    dispatch_async(self.rtspLayerQueue, ^{
+        
+        __strong typeof(self) this = weakSelf;
+        if (!this) { return; }
+        
+        AVFormatContext *formatContext = NULL;
+        
+        NSDictionary<NSString *, NSString *> *parameters = @{
+            @"rtsp_transport": @"tcp",
+            @"stimeout": @"5_000_000"
+        };
+        
+        NSError *error = [self checkStreamInputWithURL:url formatContext:&formatContext parameters:parameters];
+        if (error) { avformat_close_input(&formatContext); errorCallback(error); return; }
+        
+        int videoStreamIndex = [this videoStreamIndexWithFormatContext:formatContext];
+        if (videoStreamIndex < 0) {
+            errorCallback([this errorMessage:nil code:FFmpegVideoErrorStreamInfoFailed]);
+            avformat_close_input(&formatContext);
+            return;
+        }
+        
+        AVCodecContext *codecContext = [this createCodecContextForStreamAtIndex:videoStreamIndex formatContext: formatContext];
+        
+        enum AVPixelFormat pixelFormat = AV_PIX_FMT_BGRA;
+        struct SwsContext *swsContext = [this softwareScalerContextWithCodecContext:codecContext outputFormat:pixelFormat scalerFlags:SWS_BILINEAR];
+        
+        AVPacket *packet = av_packet_alloc();
+        AVFrame *frame = av_frame_alloc();
+        
+        FFmpegDstBuffer dstBuffer = {0};
+        int result = av_image_alloc(dstBuffer.data, dstBuffer.linesize, codecContext->width, codecContext->height, pixelFormat, 1);
+        
+        if (result < 0) {
+            errorCallback([this errorMessageResult:result code:FFmpegVideoErrorImageAllocFailed]);
+            av_freep(&dstBuffer.data[0]);
+            return;
+        }
+        
+        AVRational timeBase = formatContext->streams[videoStreamIndex]->time_base;
+        
+        while (av_read_frame(formatContext, packet) >= 0) {
+            
+            if (this.rtspLayerShouldStop) { return; }
+            if (packet->stream_index != videoStreamIndex) { av_packet_unref(packet); continue; }
+            
+            avcodec_send_packet(codecContext, packet);
+            
+            while (avcodec_receive_frame(codecContext, frame) == 0) {
+                
+                FFmpegSrcBuffer srcBuf = [this prepareSwsSrcFromFrame:frame];
+                sws_scale(swsContext, (const uint8_t * const *)srcBuf.slice, srcBuf.stride, 0, codecContext->height, dstBuffer.data, dstBuffer.linesize);
+                
+                CVPixelBufferRef pixelBuffer = NULL;
+                CVReturn cvReturn = [this createPixelBuffer: &pixelBuffer codecContext:codecContext];
+                
+                if (cvReturn != kCVReturnSuccess) { continue; }
+                if (!pixelBuffer) { continue; }
+                
+                [this copyDestinationBuffer:dstBuffer to:pixelBuffer codecContext:codecContext];
+                
+                CMTime timeStamp = CMTimeMake(frame->best_effort_timestamp * timeBase.num, timeBase.den);
+                CMSampleBufferRef sampleBuffer = NULL;
+                
+                OSStatus status = [this convertPixelBuffer:pixelBuffer to:&sampleBuffer time:timeStamp];
+                CVPixelBufferRelease(pixelBuffer);
+                
+                if (status != noErr) { continue; }
+                if (!sampleBuffer) { continue; }
+                
+                AVSampleBufferDisplayLayer *displayLayer = this.currentDisplayLayer;
+                
+                if (displayLayer) {
+                    
+                    CFRetain(sampleBuffer);
+                    
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        
+                        if (this.rtspLayerShouldStop) { CFRelease(sampleBuffer); return; }
+                        AVSampleBufferDisplayLayer *strongLayer = this.currentDisplayLayer;
+                        
+                        if (!strongLayer) { CFRelease(sampleBuffer); return; }
+                        if (strongLayer.status == AVQueuedSampleBufferRenderingStatusFailed) { [strongLayer flushAndRemoveImage]; }
+                        if (strongLayer.isReadyForMoreMediaData) { [strongLayer enqueueSampleBuffer:sampleBuffer]; }
+                        
+                        CFRelease(sampleBuffer);
+                    });
+                }
+                
+                CFRelease(sampleBuffer);
+            }
+            
             av_packet_unref(packet);
         }
         
@@ -684,6 +682,37 @@
     return result;
 }
 
+/// 根據指定的串流的Index及已開啟的 AVFormatContext，建立並開啟對應串流的 AVCodecContext
+/// - Parameters:
+///   - streamIndex: NSInteger
+///   - formatContext: AVFormatContext
+- (AVCodecContext *)createCodecContextForStreamAtIndex:(NSInteger)streamIndex formatContext:(AVFormatContext *)formatContext {
+    
+    if (streamIndex < 0 || streamIndex >= formatContext->nb_streams) { return NULL; }
+
+    AVStream *stream = formatContext->streams[streamIndex];
+    AVCodecParameters *par = stream->codecpar;
+
+    const AVCodec *codec = avcodec_find_decoder(par->codec_id);
+    if (!codec) { return NULL; }
+
+    AVCodecContext *codecContext = avcodec_alloc_context3(codec);
+    if (!codecContext) { return NULL; }
+
+    if (avcodec_parameters_to_context(codecContext, par) < 0) {
+        avcodec_free_context(&codecContext);
+        return NULL;
+    }
+
+    if (avcodec_open2(codecContext, codec, NULL) < 0) {
+        avcodec_free_context(&codecContext);
+        return NULL;
+    }
+    
+    return codecContext;
+}
+
+
 /// 設定AVDictionary
 /// - Parameter parameters: NSDictionary *
 - (AVDictionary*)avDictionaryWithParameters:(NSDictionary *)parameters {
@@ -742,7 +771,6 @@
     CVReturn cvReturn = CVPixelBufferCreate(kCFAllocatorDefault, codecContext->width, codecContext->height, kCVPixelFormatType_32BGRA, (__bridge CFDictionaryRef)attributes, pixelBuffer);
     return cvReturn;
 }
-
 
 /// BGRA → CVPixelBuffer
 /// - Parameters:

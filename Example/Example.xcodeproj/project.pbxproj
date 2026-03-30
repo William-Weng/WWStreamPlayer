@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		812E8C192F76845300A649DE /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 812E8C182F76845300A649DE /* WWStreamPlayer */; };
+		812E8C532F768C5000A649DE /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 812E8C522F768C5000A649DE /* WWStreamPlayer */; };
 		8151DAF52F7666B5008E0C2F /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 8151DAF42F7666B5008E0C2F /* WWStreamPlayer */; };
 		81C843372F7619C8003804FC /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 81C843362F7619C8003804FC /* WWStreamPlayer */; };
 		81C8433A2F761B33003804FC /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 81C843392F761B33003804FC /* WWStreamPlayer */; };
@@ -46,6 +47,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				81C843372F7619C8003804FC /* WWStreamPlayer in Frameworks */,
+				812E8C532F768C5000A649DE /* WWStreamPlayer in Frameworks */,
 				81C843402F761D27003804FC /* WWStreamPlayer in Frameworks */,
 				8151DAF52F7666B5008E0C2F /* WWStreamPlayer in Frameworks */,
 				81C8433A2F761B33003804FC /* WWStreamPlayer in Frameworks */,
@@ -99,6 +101,7 @@
 				81C8433F2F761D27003804FC /* WWStreamPlayer */,
 				8151DAF42F7666B5008E0C2F /* WWStreamPlayer */,
 				812E8C182F76845300A649DE /* WWStreamPlayer */,
+				812E8C522F768C5000A649DE /* WWStreamPlayer */,
 			);
 			productName = Example;
 			productReference = 817EE1FE2EB1FA050036B57C /* Example.app */;
@@ -129,7 +132,7 @@
 			mainGroup = 817EE1F52EB1FA050036B57C;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				812E8C172F76845300A649DE /* XCLocalSwiftPackageReference "../../@WWStreamPlayer" */,
+				812E8C512F768C5000A649DE /* XCLocalSwiftPackageReference "../../@WWStreamPlayer" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 817EE1FF2EB1FA050036B57C /* Products */;
@@ -373,7 +376,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		812E8C172F76845300A649DE /* XCLocalSwiftPackageReference "../../@WWStreamPlayer" */ = {
+		812E8C512F768C5000A649DE /* XCLocalSwiftPackageReference "../../@WWStreamPlayer" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../@WWStreamPlayer";
 		};
@@ -381,6 +384,10 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		812E8C182F76845300A649DE /* WWStreamPlayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = WWStreamPlayer;
+		};
+		812E8C522F768C5000A649DE /* WWStreamPlayer */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = WWStreamPlayer;
 		};
