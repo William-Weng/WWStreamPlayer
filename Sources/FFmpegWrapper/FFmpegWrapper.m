@@ -247,18 +247,15 @@
             return;
         }
         
-        AVStream *stream = formatContext->streams[videoStreamIndex];
-        AVCodecParameters *parameter = stream->codecpar;
-        const AVCodec *codec = avcodec_find_decoder(parameter->codec_id);
-        AVCodecContext *codecContext = avcodec_alloc_context3(codec);
-        avcodec_parameters_to_context(codecContext, parameter);
-        avcodec_open2(codecContext, codec, NULL);
+        AVCodecContext *codecContext = [this createCodecContextForStreamAtIndex:videoStreamIndex formatContext: formatContext];
+        if (codecContext == NULL) { return; }
         
         AVPacket *packet = av_packet_alloc();
         AVFrame *frame = av_frame_alloc();
         
-        while (!this.rtspShouldStop && av_read_frame(formatContext, packet) >= 0) {
+        while (av_read_frame(formatContext, packet) >= 0) {
             
+            if (this.rtspShouldStop) { return; }
             if (packet->stream_index != videoStreamIndex) { av_packet_unref(packet); continue; }
             
             avcodec_send_packet(codecContext, packet);
@@ -318,6 +315,7 @@
         if (videoStreamIndex < 0) { avformat_close_input(&formatContext); return; }
                 
         AVCodecContext *codecContext = [this createCodecContextForStreamAtIndex:videoStreamIndex formatContext: formatContext];
+        if (codecContext == NULL) { return; }
         
         enum AVPixelFormat pixelFormat = AV_PIX_FMT_BGRA;
         struct SwsContext *swsContext = [this softwareScalerContextWithCodecContext:codecContext outputFormat:pixelFormat scalerFlags:SWS_BILINEAR];
@@ -421,6 +419,7 @@
         }
         
         AVCodecContext *codecContext = [this createCodecContextForStreamAtIndex:videoStreamIndex formatContext: formatContext];
+        if (codecContext == NULL) { return; }
         
         enum AVPixelFormat pixelFormat = AV_PIX_FMT_BGRA;
         struct SwsContext *swsContext = [this softwareScalerContextWithCodecContext:codecContext outputFormat:pixelFormat scalerFlags:SWS_BILINEAR];
