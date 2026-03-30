@@ -6,7 +6,7 @@
 - [Use FFMpeg to play RSTP streaming videos.](https://www.youtube.com/watch?v=aJrI_g2qDOQ)
 - [使用FFMpeg來播放RSTP串流影片。](https://william-weng.github.io/2026/03/ffmpeg跟ios終於在一起了/)
 
-https://github.com/user-attachments/assets/fd3cc4bf-4d98-4dda-b3c3-9a57cf9b0bc8
+https://github.com/user-attachments/assets/89b0ce87-1d83-434a-bed9-9155f2d86908
 
 ### [Installation with Swift Package Manager](https://medium.com/彼得潘的-swift-ios-app-開發問題解答集/使用-spm-安裝第三方套件-xcode-11-新功能-2c4ffcf85b4b)
 ```bash
@@ -37,8 +37,8 @@ final class ViewController: UIViewController {
 
     @IBOutlet weak var ffmpegVersionLabel: UILabel!
     @IBOutlet weak var videoTimeLabel: UILabel!
-    @IBOutlet weak var layerTimeLabel: UILabel!
     @IBOutlet weak var videoImageView: UIImageView!
+    @IBOutlet weak var layerTimeLabel: UILabel!
     @IBOutlet weak var layerImageView: UIImageView!
 
     private let rtsp = "rtsp://localhost:8554/mystream"
@@ -79,9 +79,20 @@ private extension ViewController {
         WWStreamPlayer.shared.stop(for: .image)
 
         WWStreamPlayer.shared.play(at: url) { image, elapseTime in
-            self.videoTimeLabel.text = "\(CMTimeGetSeconds(elapseTime))"
+            self.videoTimeLabel.text = "\(Int(CMTimeGetSeconds(elapseTime)))"
             self.videoImageView.image = image
         }
+    }
+    
+    func playRtspSteam2(at urlString: String) {
+        
+        guard let url = URL(string: urlString) else { return }
+        
+        WWStreamPlayer.shared.stop(for: .displayLayer)
+        
+        WWStreamPlayer.shared.play(at: url, displayLayer: displayLayer, elapseTime: { elapseTime in
+            self.layerTimeLabel.text = "\(Int(CMTimeGetSeconds(elapseTime)))"
+        })
     }
 }
 ```

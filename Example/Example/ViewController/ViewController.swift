@@ -13,8 +13,8 @@ final class ViewController: UIViewController {
 
     @IBOutlet weak var ffmpegVersionLabel: UILabel!
     @IBOutlet weak var videoTimeLabel: UILabel!
-    @IBOutlet weak var layerTimeLabel: UILabel!
     @IBOutlet weak var videoImageView: UIImageView!
+    @IBOutlet weak var layerTimeLabel: UILabel!
     @IBOutlet weak var layerImageView: UIImageView!
 
     private let rtsp = "rtsp://localhost:8554/mystream"
@@ -60,7 +60,7 @@ private extension ViewController {
         WWStreamPlayer.shared.stop(for: .image)
 
         WWStreamPlayer.shared.play(at: url) { image, elapseTime in
-            self.videoTimeLabel.text = "\(CMTimeGetSeconds(elapseTime))"
+            self.videoTimeLabel.text = "\(Int(CMTimeGetSeconds(elapseTime)))"
             self.videoImageView.image = image
         }
     }
@@ -74,7 +74,7 @@ private extension ViewController {
         WWStreamPlayer.shared.stop(for: .displayLayer)
         
         WWStreamPlayer.shared.play(at: url, displayLayer: displayLayer, elapseTime: { elapseTime in
-            self.layerTimeLabel.text = "\(CMTimeGetSeconds(elapseTime))"
+            self.layerTimeLabel.text = "\(Int(CMTimeGetSeconds(elapseTime)))"
         })
     }
 }

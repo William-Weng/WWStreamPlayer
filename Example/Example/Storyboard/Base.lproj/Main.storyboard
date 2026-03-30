@@ -38,7 +38,7 @@
                                                         <rect key="frame" x="0.0" y="0.0" width="375" height="302"/>
                                                     </imageView>
                                                     <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="&lt;Time&gt;" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="97h-SM-S93">
-                                                        <rect key="frame" x="153.66666666666666" y="139" width="67.666666666666657" height="24"/>
+                                                        <rect key="frame" x="153.66666666666666" y="262" width="67.666666666666657" height="24"/>
                                                         <color key="backgroundColor" red="0.0" green="0.0" blue="0.0" alpha="0.30160906459999998" colorSpace="custom" customColorSpace="sRGB"/>
                                                         <fontDescription key="fontDescription" type="system" pointSize="20"/>
                                                         <color key="textColor" systemColor="groupTableViewBackgroundColor"/>
@@ -47,12 +47,12 @@
                                                 </subviews>
                                                 <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                                 <constraints>
-                                                    <constraint firstItem="97h-SM-S93" firstAttribute="centerX" secondItem="BHi-WQ-oRT" secondAttribute="centerX" id="0gN-87-zpc"/>
-                                                    <constraint firstItem="97h-SM-S93" firstAttribute="centerY" secondItem="BHi-WQ-oRT" secondAttribute="centerY" id="4uX-Tg-9z9"/>
-                                                    <constraint firstItem="awQ-5y-5ot" firstAttribute="centerX" secondItem="BHi-WQ-oRT" secondAttribute="centerX" id="LU3-8q-UKw"/>
-                                                    <constraint firstItem="awQ-5y-5ot" firstAttribute="centerY" secondItem="BHi-WQ-oRT" secondAttribute="centerY" id="OTO-lT-tyk"/>
-                                                    <constraint firstItem="awQ-5y-5ot" firstAttribute="top" secondItem="BHi-WQ-oRT" secondAttribute="top" id="X93-Y2-zaj"/>
-                                                    <constraint firstAttribute="trailing" secondItem="awQ-5y-5ot" secondAttribute="trailing" id="XSA-AK-woJ"/>
+                                                    <constraint firstItem="97h-SM-S93" firstAttribute="centerX" secondItem="BHi-WQ-oRT" secondAttribute="centerX" id="8dK-TB-MT4"/>
+                                                    <constraint firstAttribute="bottom" secondItem="97h-SM-S93" secondAttribute="bottom" constant="16" id="EB1-x8-vhP"/>
+                                                    <constraint firstItem="awQ-5y-5ot" firstAttribute="top" secondItem="BHi-WQ-oRT" secondAttribute="top" id="Wqw-vS-UXO"/>
+                                                    <constraint firstAttribute="trailing" secondItem="awQ-5y-5ot" secondAttribute="trailing" id="ZGp-X6-Pit"/>
+                                                    <constraint firstItem="awQ-5y-5ot" firstAttribute="centerY" secondItem="BHi-WQ-oRT" secondAttribute="centerY" id="a1u-Lq-Uoz"/>
+                                                    <constraint firstItem="awQ-5y-5ot" firstAttribute="centerX" secondItem="BHi-WQ-oRT" secondAttribute="centerX" id="dgK-rl-dFv"/>
                                                 </constraints>
                                             </view>
                                             <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Loj-tA-d1f">
@@ -62,7 +62,7 @@
                                                         <rect key="frame" x="0.0" y="0.0" width="375" height="302"/>
                                                     </imageView>
                                                     <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="&lt;Time&gt;" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="aX1-cl-Spb">
-                                                        <rect key="frame" x="153.66666666666666" y="139" width="67.666666666666657" height="24"/>
+                                                        <rect key="frame" x="153.66666666666666" y="262" width="67.666666666666657" height="24"/>
                                                         <color key="backgroundColor" red="0.0" green="0.0" blue="0.0" alpha="0.3016090645695364" colorSpace="custom" customColorSpace="sRGB"/>
                                                         <fontDescription key="fontDescription" type="system" pointSize="20"/>
                                                         <color key="textColor" systemColor="groupTableViewBackgroundColor"/>
@@ -72,10 +72,10 @@
                                                 <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                                                 <constraints>
                                                     <constraint firstItem="Fdj-aR-xDP" firstAttribute="centerX" secondItem="Loj-tA-d1f" secondAttribute="centerX" id="Fnf-dC-LOK"/>
-                                                    <constraint firstItem="aX1-cl-Spb" firstAttribute="centerX" secondItem="Loj-tA-d1f" secondAttribute="centerX" id="Fsv-Ar-fMk"/>
-                                                    <constraint firstItem="aX1-cl-Spb" firstAttribute="centerY" secondItem="Loj-tA-d1f" secondAttribute="centerY" id="Jrz-r8-Qdy"/>
                                                     <constraint firstItem="Fdj-aR-xDP" firstAttribute="centerY" secondItem="Loj-tA-d1f" secondAttribute="centerY" id="X6A-et-XVa"/>
+                                                    <constraint firstItem="aX1-cl-Spb" firstAttribute="centerX" secondItem="Loj-tA-d1f" secondAttribute="centerX" id="aLe-up-zQE"/>
                                                     <constraint firstAttribute="trailing" secondItem="Fdj-aR-xDP" secondAttribute="trailing" id="bXR-Np-hvd"/>
+                                                    <constraint firstAttribute="bottom" secondItem="aX1-cl-Spb" secondAttribute="bottom" constant="16" id="c2R-9g-6OJ"/>
                                                     <constraint firstItem="Fdj-aR-xDP" firstAttribute="top" secondItem="Loj-tA-d1f" secondAttribute="top" id="reH-wN-XeO"/>
                                                 </constraints>
                                             </view>
