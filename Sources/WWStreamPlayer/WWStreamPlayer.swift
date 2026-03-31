@@ -12,6 +12,8 @@ open class WWStreamPlayer: NSObject {
 
     public static let shared = WWStreamPlayer()
     
+    var totalPCM: Data = .init()
+    
     private override init() {
         super.init()
     }
@@ -26,6 +28,13 @@ public extension WWStreamPlayer {
         return FFmpegWrapper.shared().version()
     }
     
+    /// 取得編碼ID名稱 - AVCodecID(rawValue: 86018) => aac
+    /// - Parameter id: AVCodecID
+    /// - Returns: String
+    func codecName(with id: AVCodecID) -> String {
+        return FFmpegWrapper.shared().codecName(with: id)
+    }
+        
     /// 取得本地端影片長度
     /// - Parameter url: URL
     /// - Returns: Result<TimeInterval, Error>
@@ -115,6 +124,31 @@ public extension WWStreamPlayer {
         case .image: FFmpegWrapper.shared().stopRTSPPlay()
         case .displayLayer: FFmpegWrapper.shared().stopRTSPPlayOnDisplayLayer()
         case .pixelBuffer: FFmpegWrapper.shared().stopRTSPPlayWithPixelBuffer()
+        }
+    }
+    
+    func decodeAudioStream(at url: URL, codecCallback: @escaping ((AVCodecParameters) -> Void), pcmCallback: @escaping FFmpegPCMCallback) {
+        
+        FFmpegWrapper.shared().decodeAudioStream(url) { paramaters in
+            codecCallback(paramaters.pointee)
+        } pcmCallback: { data, sampleRate, channels in
+            
+            self.totalPCM.append(data)
+            
+            print("\(sampleRate) => \(channels)")
+            
+            if (self.totalPCM.count > 1_000_000) {  // 1秒
+                
+                do {
+                    let dir = NSTemporaryDirectory()
+                    try self.totalPCM.write(to: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("total.wav"))
+                    print(dir)
+                } catch {
+                    
+                }
+            }
+            
+            // FFmpegWrapper.shared().playPCM(data, sampleRate: sampleRate, channels: channels)
         }
     }
 }

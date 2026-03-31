@@ -5,7 +5,9 @@
 //  Created by William.Weng on 2026/3/27.
 //
 
+#import <CoreImage/CoreImage.h>
 #import "FFmpegWrapper.h"
+#import "StreamPlayer.h"
 #import "Model.h"
 
 @interface FFmpegWrapper ()
@@ -13,6 +15,7 @@
 @property (nonatomic, strong) dispatch_queue_t rtspQueue;
 @property (nonatomic, strong) dispatch_queue_t rtspLayerQueue;
 @property (nonatomic, strong) dispatch_queue_t rtspPixelQueue;
+@property (nonatomic, strong) dispatch_queue_t rtspAudioQueue;
 
 @property (atomic, assign) BOOL rtspShouldStop;
 @property (atomic, assign) BOOL rtspLayerShouldStop;
@@ -20,6 +23,9 @@
 
 @property (nonatomic, weak) AVSampleBufferDisplayLayer *currentDisplayLayer;
 @property (nonatomic, copy) FFmpegPixelBufferCallback pixelCallback;
+
+@property (nonatomic, assign) SwrContext *swrCtx;
+
 
 @end
 
@@ -36,6 +42,11 @@
     return instance;
 }
 
+typedef NS_ENUM(NSInteger, FFmpegStreamType) {
+    FFmpegStreamTypeVideo,
+    FFmpegStreamTypeAudio
+};
+
 /// 初始化
 - (instancetype)init {
     
@@ -43,11 +54,13 @@
     
     if (self) {
         
+        av_log_set_level(AV_LOG_ERROR);
         avformat_network_init();
         
         _rtspLayerQueue = dispatch_queue_create("ffmpeg.rtsp.displaylayer.queue", DISPATCH_QUEUE_SERIAL);
         _rtspQueue = dispatch_queue_create("ffmpeg.rtsp.queue", DISPATCH_QUEUE_SERIAL);
         _rtspPixelQueue = dispatch_queue_create("ffmpeg.rtsp.pixel.queue", DISPATCH_QUEUE_SERIAL);
+        _rtspAudioQueue = dispatch_queue_create("ffmpeg.rtsp.audio.queue", DISPATCH_QUEUE_SERIAL);
     }
     
     return self;
@@ -59,6 +72,13 @@
     return [NSString stringWithUTF8String:av_version_info()];
 }
 
+/// 取得編碼ID名稱 - AVCodecID(rawValue: 86018) => aac
+/// - Parameter codecID: enum AVCodecID
+- (NSString*)codecNameWithId:(enum AVCodecID)codecID {
+    return [NSString stringWithUTF8String:avcodec_get_name(codecID)];
+}
+
+// MARK: - 公開函數
 /// 取得該URL的影音長度 (0: 錯誤 / -1: RTSP直播 => 無限長) => ffmpeg -rtsp_transport tcp -i rtsp://xxx
 /// - Parameters:
 ///   - url: NSURL
@@ -699,8 +719,6 @@
 ///   - stream: AVStream
 - (CMTime)timeFromFrame:(AVFrame *)frame stream:(AVStream *)stream {
     
-    // CMTime timeStamp = CMTimeMake(frame->best_effort_timestamp * timeBase.num, timeBase.den);
-    
     AVRational timeBase = stream->time_base;
     int64_t bestTimestamp = frame->best_effort_timestamp;
     CMTime timeStamp = CMTimeMake(bestTimestamp * timeBase.num, timeBase.den);
@@ -882,4 +900,138 @@
     return [self errorMessage:message code:code];
 }
 
+/// TODO: 播放聲音
+- (void)playPCM:(NSData *)pcmData sampleRate:(int)sampleRate channels:(int)channels {
+    [[StreamPlayer shared] playPCM:pcmData sampleRate:sampleRate channels:channels];
+}
+
+- (void)decodeAudioStream:(NSURL *)url codecCallback:(void (^)(AVCodecParameters *parameters))codecCallback pcmCallback:(FFmpegPCMCallback)pcmCallback {
+    
+    [self findAudioStream:url codecCallback:codecCallback decodeCallback:^(AVFormatContext * _Nonnull formatContext, NSInteger audioStreamIndex) {
+        [self startAudioDecodeLoop:formatContext audioStreamIndex:audioStreamIndex pcmCallback:pcmCallback];
+    }];
+}
+
+- (void)findAudioStream:(NSURL *)url codecCallback:(void (^)(AVCodecParameters *parameters))codecCallback decodeCallback:(FFmpegDecodeCallback)decodeCallback {
+    
+    AVFormatContext *formatContext = NULL;
+    
+    int result = avformat_open_input(&formatContext, [[url absoluteString] UTF8String], NULL, NULL);
+    
+    if (result < 0) {
+        char errbuf[256];
+        av_strerror(result, errbuf, sizeof(errbuf));
+        NSLog(@"開啟失敗: %s", errbuf);
+        return;
+    }
+    
+    if (avformat_find_stream_info(formatContext, NULL) < 0) { return; }
+    
+    NSInteger audioStreamIndex = -1;
+    NSString *codecName = nil;
+    
+    for (NSInteger index = 0; index < formatContext->nb_streams; index++) {
+        if (formatContext->streams[index]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+            audioStreamIndex = index;
+            codecName = [NSString stringWithUTF8String:avcodec_get_name(formatContext->streams[index]->codecpar->codec_id)];
+            NSLog(@"音訊串流: %ld, %@", (long)index, codecName);
+            break;
+        }
+    }
+    
+    if (audioStreamIndex < 0) { avformat_close_input(&formatContext); return; }
+    
+    if (codecCallback) {
+        AVStream *audioStream = formatContext->streams[audioStreamIndex];
+        codecCallback(audioStream->codecpar);
+    }
+    
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        if (decodeCallback) {
+            decodeCallback(formatContext, audioStreamIndex);  // 傳出 context
+        }
+    });
+}
+
+- (void)startAudioDecodeLoop:(AVFormatContext *)formatContext
+             audioStreamIndex:(NSInteger)audioStreamIndex
+                 pcmCallback:(FFmpegPCMCallback)pcmCallback {
+    
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        @autoreleasepool {  // 防洩漏 [cite:2]
+            __strong typeof(self) self = weakSelf;
+            if (!self) return;
+            
+            AVStream *audioStream = formatContext->streams[audioStreamIndex];
+            AVCodecParameters *codecpar = audioStream->codecpar;
+            
+            AVCodec *decoder = avcodec_find_decoder(codecpar->codec_id);
+            if (!decoder) {
+                NSLog(@"找不到解碼器");
+                goto cleanup;
+            }
+            
+            AVCodecContext *decCtx = avcodec_alloc_context3(decoder);
+            avcodec_parameters_to_context(decCtx, codecpar);
+            if (avcodec_open2(decCtx, decoder, NULL) < 0) {
+                NSLog(@"開啟解碼器失敗");
+                goto cleanup;
+            }
+            
+            AVPacket *pkt = av_packet_alloc();
+            AVFrame *frame = av_frame_alloc();
+            
+            int ret;
+            while ((ret = av_read_frame(formatContext, pkt)) >= 0) {
+                if (pkt->stream_index == audioStreamIndex) {
+                    ret = avcodec_send_packet(decCtx, pkt);
+                    if (ret < 0 && ret != AVERROR(EAGAIN)) continue;
+                    
+                    while ((ret = avcodec_receive_frame(decCtx, frame)) == 0) {
+                        // 手動交錯（無 SWR，穩定）
+                        int channels = decCtx->ch_layout.nb_channels ?: codecpar->ch_layout.nb_channels;
+                        int pcmSize = frame->nb_samples * channels * 2;  // S16
+                        uint8_t *pcmBuf = malloc(pcmSize);
+                        int16_t *dst = (int16_t*)pcmBuf;
+                        
+                        if (channels == 1) {
+                            memcpy(dst, frame->data[0], pcmSize);
+                        } else if (channels == 2) {
+                            int16_t *left = (int16_t*)frame->data[0];
+                            int16_t *right = (int16_t*)frame->data[1];
+                            for (int i = 0; i < frame->nb_samples; i++) {
+                                dst[i*2] = left[i];
+                                dst[i*2+1] = right[i];
+                            }
+                        } else {
+                            free(pcmBuf); continue;  // 暫不支援 >2ch
+                        }
+                        
+                        if (pcmCallback) {
+                            NSData *pcmData = [NSData dataWithBytesNoCopy:pcmBuf
+                                                                   length:pcmSize
+                                                         freeWhenDone:YES];
+                            pcmCallback(pcmData, decCtx->sample_rate, channels);
+                        }
+                        
+                        av_frame_unref(frame);
+                    }
+                }
+                av_packet_unref(pkt);
+            }
+            
+        cleanup:
+            av_packet_free(&pkt);
+            av_frame_free(&frame);
+            if (decCtx) avcodec_free_context(&decCtx);
+            avformat_close_input(&formatContext);  // **這裡關閉**
+        }
+    });
+}
+
+
 @end
+
+
+
