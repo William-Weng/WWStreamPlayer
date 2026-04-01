@@ -73,12 +73,20 @@ private extension ViewController {
         
         guard let url = URL(string: urlString) else { return }
         
-        WWStreamPlayer.shared.decodeAudioStream(at: url) { codec in
-            let codecName = WWStreamPlayer.shared.codecName(with: codec.codec_id)
-            print("[Codec] \(codecName) => \(codec.codec_id)")
-        } pcmCallback: { pcmData, sampleRate, channels in
-            self.playPCM(pcmData, sampleRate: Int(sampleRate), channels: Int(channels))
-        }
+        guard let url = URL(string: urlString) else { return }
+        
+        WWStreamPlayer.shared.stop(for: .displayLayer)
+        
+        WWStreamPlayer.shared.play(at: url, displayLayer: displayLayer, elapseTime: { elapseTime in
+            self.layerTimeLabel.text = "\(Int(CMTimeGetSeconds(elapseTime)))"
+        })
+        
+//        WWStreamPlayer.shared.decodeAudioStream(at: url) { codec in
+//            let codecName = WWStreamPlayer.shared.codecName(with: codec.codec_id)
+//            print("[Codec] \(codecName) => \(codec.codec_id)")
+//        } pcmCallback: { pcmData, sampleRate, channels in
+//            self.playPCM(pcmData, sampleRate: Int(sampleRate), channels: Int(channels))
+//        }
     }
     
     // MARK: - 獨立播放函數

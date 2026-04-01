@@ -1,3 +1,10 @@
+//
+//  StreamPlayer.m
+//  WWStreamPlayer
+//
+//  Created by William.Weng on 2026/4/1.
+//
+
 #import <AudioToolbox/AudioToolbox.h>
 #import "StreamPlayer.h"
 #import "AVFoundation/AVFoundation.h"

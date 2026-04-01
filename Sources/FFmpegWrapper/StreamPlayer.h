@@ -1,4 +1,10 @@
-// WWStreamPlayer.h
+//
+//  StreamPlayer.h
+//  WWStreamPlayer
+//
+//  Created by William.Weng on 2026/4/1.
+//
+
 #import <AudioToolbox/AudioToolbox.h>
 
 typedef void (^FFmpegPCMCallback)(NSData *pcmData, int sampleRate, int channels);

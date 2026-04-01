@@ -8,7 +8,7 @@
 #import <CoreImage/CoreImage.h>
 #import "FFmpegWrapper.h"
 #import "StreamPlayer.h"
-#import "Model.h"
+#import "Utility.h"
 
 @interface FFmpegWrapper ()
 
@@ -21,11 +21,11 @@
 @property (atomic, assign) BOOL rtspLayerShouldStop;
 @property (atomic, assign) BOOL rtspPixelShouldStop;
 
+@property (nonatomic, strong) Utility *util;
 @property (nonatomic, weak) AVSampleBufferDisplayLayer *currentDisplayLayer;
 @property (nonatomic, copy) FFmpegPixelBufferCallback pixelCallback;
 
 @property (nonatomic, assign) SwrContext *swrCtx;
-
 
 @end
 
@@ -38,7 +38,7 @@
     static dispatch_once_t onceToken;
     
     dispatch_once(&onceToken, ^{ instance = [[FFmpegWrapper alloc] init]; });
-    
+        
     return instance;
 }
 
@@ -53,6 +53,8 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
     self = [super init];
     
     if (self) {
+        
+        _util = [Utility new];
         
         av_log_set_level(AV_LOG_ERROR);
         avformat_network_init();
@@ -85,20 +87,13 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
 ///   - error: NSError
 - (NSTimeInterval)durationAtURL:(NSURL *)url error:(NSError **)error {
     
-    if (!url) {
-        if (error) { *error = [self errorMessage:nil code:FFmpegVideoErrorInvalidURL]; }
-        return 0;
-    }
-    
-    if (![(NSString *)[url absoluteString] length]) {
-        if (error) { *error = [self errorMessage:nil code:FFmpegVideoErrorInvalidURL]; }
-        return 0;
-    }
+    if (!url) { if (error) { *error = [[self util] errorMessage:nil code:FFmpegVideoErrorInvalidURL]; } return 0; }
+    if (![(NSString *)[url absoluteString] length]) { if (error) { *error = [[self util] errorMessage:nil code:FFmpegVideoErrorInvalidURL]; } return 0; }
     
     AVFormatContext *formatContext = NULL;
     NSDictionary<NSString *, NSString *> *parameters = @{ @"rtsp_transport": @"tcp" };
     
-    *error = [self checkStreamInputWithURL:url formatContext:&formatContext parameters:parameters];
+    *error = [[self util] checkStreamInputWithURL:url formatContext:&formatContext parameters:parameters];
     if (*error) { avformat_close_input(formatContext); return 0; }
     
     int64_t duration = formatContext->duration;
@@ -113,30 +108,7 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
 ///   - url: NSURL
 ///   - second: NSTimeInterval
 - (UIImage *)frameAtURL:(NSURL *)url second:(NSTimeInterval)second {
-    
-    AVFormatContext *formatContext = NULL;
-    
-    NSError *error = [self checkStreamInputWithURL:url formatContext:&formatContext parameters:nil];
-    if (error) { return nil; }
-    
-    int videoStreamIndex = [self videoStreamIndexWithFormatContext:formatContext];
-    if (videoStreamIndex < 0) { avformat_close_input(&formatContext); return nil; }
-    
-    int64_t timestamp = av_rescale_q((int64_t)(second * AV_TIME_BASE), (AVRational){1, AV_TIME_BASE}, formatContext->streams[videoStreamIndex]->time_base);
-    av_seek_frame(formatContext, videoStreamIndex, timestamp, AVSEEK_FLAG_BACKWARD);
-    
-    AVCodecContext *codecCtx = avcodec_alloc_context3(NULL);
-    AVCodecParameters *parameter = formatContext->streams[videoStreamIndex]->codecpar;
-    
-    avcodec_parameters_to_context(codecCtx, parameter);
-    avcodec_open2(codecCtx, avcodec_find_decoder(parameter->codec_id), NULL);
-    av_seek_frame(formatContext, videoStreamIndex, timestamp, AVSEEK_FLAG_BACKWARD);
-    avcodec_flush_buffers(codecCtx);
-    
-    UIImage *image = [self seekFrameAtSecond:second context:formatContext streamIndex:videoStreamIndex];
-    avformat_close_input(&formatContext);
-    
-    return image;
+    return [self getFrameAtURL:url second:second];
 }
 
 /// 尋找縮圖 (平均時間)
@@ -153,8 +125,8 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
     
     for (int index = 0; index < count; index++) {
         NSTimeInterval second = interval * (index + 0.5);
-        UIImage *thumb = [self frameAtURL:url second:second];
-        if (thumb) { [thumbnails addObject:thumb]; }
+        UIImage *thumbnail = [self frameAtURL:url second:second];
+        if (thumbnail) { [thumbnails addObject:thumbnail]; }
     }
     
     return thumbnails;
@@ -231,7 +203,38 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
     self.pixelCallback = nil;
 }
 
-// MARK: - 小工具
+// MARK: - 🈲 小工具
+/// 取得本地端影音該時段的畫面
+/// - Parameters:
+///   - url: NSURL
+///   - second: NSTimeInterval
+- (UIImage *)getFrameAtURL:(NSURL *)url second:(NSTimeInterval)second {
+    
+    AVFormatContext *formatContext = NULL;
+    
+    NSError *error = [[self util] checkStreamInputWithURL:url formatContext:&formatContext parameters:nil];
+    if (error) { return nil; }
+    
+    int videoStreamIndex = [[self util] streamIndexFromFormatContext:formatContext mediaType:AVMEDIA_TYPE_VIDEO];
+    if (videoStreamIndex < 0) { avformat_close_input(&formatContext); return nil; }
+    
+    int64_t timestamp = av_rescale_q((int64_t)(second * AV_TIME_BASE), (AVRational){1, AV_TIME_BASE}, formatContext->streams[videoStreamIndex]->time_base);
+    av_seek_frame(formatContext, videoStreamIndex, timestamp, AVSEEK_FLAG_BACKWARD);
+    
+    AVCodecContext *codecCtx = avcodec_alloc_context3(NULL);
+    AVCodecParameters *parameter = formatContext->streams[videoStreamIndex]->codecpar;
+    
+    avcodec_parameters_to_context(codecCtx, parameter);
+    avcodec_open2(codecCtx, avcodec_find_decoder(parameter->codec_id), NULL);
+    av_seek_frame(formatContext, videoStreamIndex, timestamp, AVSEEK_FLAG_BACKWARD);
+    avcodec_flush_buffers(codecCtx);
+    
+    UIImage *image = [[self util] seekFrameAtSecond:second context:formatContext streamIndex:videoStreamIndex];
+    avformat_close_input(&formatContext);
+    
+    return image;
+}
+
 /// 取得RTSP串流畫面
 /// - Parameters:
 ///   - url: NSURL
@@ -257,22 +260,22 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
         
         NSDictionary<NSString *, NSString *> *parameters = @{
             @"rtsp_transport": @"tcp",
-            @"stimeout": @"5_000_000",
+            @"stimeout": @"5000000",
         };
         
-        NSError *error = [self checkStreamInputWithURL:url formatContext:&formatContext parameters:parameters];
+        NSError *error = [[this util] checkStreamInputWithURL:url formatContext:&formatContext parameters:parameters];
         if (error) { avformat_close_input(&formatContext); errorCallback(error); return; }
         
-        int videoStreamIndex = [this videoStreamIndexWithFormatContext:formatContext];
+        int videoStreamIndex = [[this util] streamIndexFromFormatContext:formatContext mediaType:AVMEDIA_TYPE_VIDEO];
         
         if (videoStreamIndex < 0) {
-            errorCallback([this errorMessage:nil code:FFmpegVideoErrorStreamInfoFailed]);
+            errorCallback([[this util] errorMessage:nil code:FFmpegVideoErrorStreamInfoFailed]);
             avformat_close_input(&formatContext);
             return;
         }
         
         AVStream *stream = formatContext->streams[videoStreamIndex];
-        AVCodecContext *codecContext = [this createCodecContextForStream:stream formatContext: formatContext];
+        AVCodecContext *codecContext = [[this util] createCodecContextForStream:stream formatContext: formatContext];
         if (codecContext == NULL) { return; }
         
         AVPacket *packet = av_packet_alloc();
@@ -288,8 +291,8 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
             while (avcodec_receive_frame(codecContext, frame) == 0) {
                 
                 @autoreleasepool {
-                    CMTime timeStamp = [this timeFromFrame:frame stream:stream];
-                    UIImage *image = [self yuvToImage:frame];
+                    CMTime timeStamp = [[this util] timeFromFrame:frame stream:stream];
+                    UIImage *image = [[this util] yuvToImage:frame];
                     frameCallback(image, timeStamp);
                     av_frame_unref(frame);
                 }
@@ -332,21 +335,21 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
         
         NSDictionary<NSString *, NSString *> *parameters = @{
             @"rtsp_transport": @"tcp",
-            @"stimeout": @"5_000_000"
+            @"stimeout": @"5000000"
         };
         
-        NSError *error = [self checkStreamInputWithURL:url formatContext:&formatContext parameters:parameters];
+        NSError *error = [[this util] checkStreamInputWithURL:url formatContext:&formatContext parameters:parameters];
         if (error) { avformat_close_input(&formatContext); errorCallback(error); return; }
         
-        int videoStreamIndex = [this videoStreamIndexWithFormatContext:formatContext];
+        int videoStreamIndex = [[this util] streamIndexFromFormatContext:formatContext mediaType:AVMEDIA_TYPE_VIDEO];
         if (videoStreamIndex < 0) { avformat_close_input(&formatContext); return; }
         
         AVStream* stream = formatContext->streams[videoStreamIndex];
-        AVCodecContext *codecContext = [this createCodecContextForStream:stream formatContext: formatContext];
+        AVCodecContext *codecContext = [[this util] createCodecContextForStream:stream formatContext: formatContext];
         if (codecContext == NULL) { return; }
         
         enum AVPixelFormat pixelFormat = AV_PIX_FMT_BGRA;
-        struct SwsContext *swsContext = [this softwareScalerContextWithCodecContext:codecContext outputFormat:pixelFormat scalerFlags:SWS_BILINEAR];
+        struct SwsContext *swsContext = [[this util] softwareScalerContextWithCodecContext:codecContext outputFormat:pixelFormat scalerFlags:SWS_BILINEAR];
         
         AVPacket *packet = av_packet_alloc();
         AVFrame *frame = av_frame_alloc();
@@ -355,7 +358,7 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
         int result = av_image_alloc(dstBuffer.data, dstBuffer.linesize, codecContext->width, codecContext->height, pixelFormat, 1);
         
         if (result < 0) {
-            errorCallback([this errorMessageResult:result code:FFmpegVideoErrorImageAllocFailed]);
+            errorCallback([[this util] errorMessageResult:result code:FFmpegVideoErrorImageAllocFailed]);
             av_freep(&dstBuffer.data[0]);
             return;
         }
@@ -367,18 +370,18 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
             
             avcodec_send_packet(codecContext, packet);
             
-            while(avcodec_receive_frame(codecContext, frame) == 0) {
+            while (avcodec_receive_frame(codecContext, frame) == 0) {
                 
-                FFmpegSrcBuffer srcBuf = [this prepareSwsSrcFromFrame:frame];
+                FFmpegSrcBuffer srcBuf = [[this util] prepareSwsSrcFromFrame:frame];
                 sws_scale(swsContext, (const uint8_t * const *)srcBuf.slice, srcBuf.stride, 0, codecContext->height, dstBuffer.data, dstBuffer.linesize);
                 
                 CVPixelBufferRef pixelBuffer = NULL;
-                CVReturn cvReturn = [this createMetalPixelBuffer:&pixelBuffer codecContext:codecContext];
+                CVReturn cvReturn = [[this util] createPixelBuffer:&pixelBuffer codecContext:codecContext useMetal: true];
 
                 if (cvReturn != kCVReturnSuccess) { continue; }
                 if (!pixelBuffer) { continue; }
                 
-                [this copyDestinationBuffer:dstBuffer to:pixelBuffer codecContext:codecContext];
+                [[this util] copyDestinationBuffer:dstBuffer to:pixelBuffer codecContext:codecContext];
                 
                 FFmpegPixelBufferCallback callback = this.pixelCallback;
                 
@@ -387,7 +390,7 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
                     CFRetain(pixelBuffer);
                     
                     dispatch_async(dispatch_get_main_queue(), ^{
-                        CMTime timeStamp = [this timeFromFrame:frame stream:stream];
+                        CMTime timeStamp = [[this util] timeFromFrame:frame stream:stream];
                         callback(pixelBuffer, timeStamp);
                         CFRelease(pixelBuffer);
                     });
@@ -434,25 +437,25 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
         
         NSDictionary<NSString *, NSString *> *parameters = @{
             @"rtsp_transport": @"tcp",
-            @"stimeout": @"5_000_000"
+            @"stimeout": @"5000000"
         };
         
-        NSError *error = [self checkStreamInputWithURL:url formatContext:&formatContext parameters:parameters];
+        NSError *error = [[this util] checkStreamInputWithURL:url formatContext:&formatContext parameters:parameters];
         if (error) { avformat_close_input(&formatContext); errorCallback(error); return; }
         
-        int videoStreamIndex = [this videoStreamIndexWithFormatContext:formatContext];
+        int videoStreamIndex = [[this util] streamIndexFromFormatContext:formatContext mediaType:AVMEDIA_TYPE_VIDEO];
         if (videoStreamIndex < 0) {
-            errorCallback([this errorMessage:nil code:FFmpegVideoErrorStreamInfoFailed]);
+            errorCallback([[this util] errorMessage:nil code:FFmpegVideoErrorStreamInfoFailed]);
             avformat_close_input(&formatContext);
             return;
         }
         
         AVStream* stream = formatContext->streams[videoStreamIndex];
-        AVCodecContext *codecContext = [this createCodecContextForStream:stream formatContext: formatContext];
+        AVCodecContext *codecContext = [[this util] createCodecContextForStream:stream formatContext: formatContext];
         if (codecContext == NULL) { return; }
         
         enum AVPixelFormat pixelFormat = AV_PIX_FMT_BGRA;
-        struct SwsContext *swsContext = [this softwareScalerContextWithCodecContext:codecContext outputFormat:pixelFormat scalerFlags:SWS_BILINEAR];
+        struct SwsContext *swsContext = [[this util] softwareScalerContextWithCodecContext:codecContext outputFormat:pixelFormat scalerFlags:SWS_BILINEAR];
         
         AVPacket *packet = av_packet_alloc();
         AVFrame *frame = av_frame_alloc();
@@ -461,7 +464,7 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
         int result = av_image_alloc(dstBuffer.data, dstBuffer.linesize, codecContext->width, codecContext->height, pixelFormat, 1);
         
         if (result < 0) {
-            errorCallback([this errorMessageResult:result code:FFmpegVideoErrorImageAllocFailed]);
+            errorCallback([[this util] errorMessageResult:result code:FFmpegVideoErrorImageAllocFailed]);
             av_freep(&dstBuffer.data[0]);
             return;
         }
@@ -477,21 +480,21 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
             
             while (avcodec_receive_frame(codecContext, frame) == 0) {
                 
-                FFmpegSrcBuffer srcBuf = [this prepareSwsSrcFromFrame:frame];
+                FFmpegSrcBuffer srcBuf = [[this util] prepareSwsSrcFromFrame:frame];
                 sws_scale(swsContext, (const uint8_t * const *)srcBuf.slice, srcBuf.stride, 0, codecContext->height, dstBuffer.data, dstBuffer.linesize);
                 
                 CVPixelBufferRef pixelBuffer = NULL;
-                CVReturn cvReturn = [this createPixelBuffer: &pixelBuffer codecContext:codecContext];
+                CVReturn cvReturn = [[this util] createPixelBuffer:&pixelBuffer codecContext:codecContext useMetal: false];
                 
                 if (cvReturn != kCVReturnSuccess) { continue; }
                 if (!pixelBuffer) { continue; }
                 
-                [this copyDestinationBuffer:dstBuffer to:pixelBuffer codecContext:codecContext];
-                                
-                CMTime timeStamp = [this timeFromFrame:frame stream:stream];
+                [[this util] copyDestinationBuffer:dstBuffer to:pixelBuffer codecContext:codecContext];
+                
+                CMTime timeStamp = [[this util] timeFromFrame:frame stream:stream];
                 CMSampleBufferRef sampleBuffer = NULL;
                 
-                OSStatus status = [this convertPixelBuffer:pixelBuffer to:&sampleBuffer time:timeStamp];
+                OSStatus status = [[this util] convertPixelBuffer:pixelBuffer to:&sampleBuffer time:timeStamp];
                 CVPixelBufferRelease(pixelBuffer);
                 
                 timeCallback(timeStamp);
@@ -536,370 +539,6 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
 }
 
 // MARK: - 小工具
-/// 尋找該秒的Frame (畫面)
-/// - Parameters:
-///   - second: 秒數
-///   - formatCtx: AVFormatContext
-///   - videoStreamIndex: 影片的StreamIndex
-- (UIImage *)seekFrameAtSecond:(NSTimeInterval)second context:(AVFormatContext *)formatCtx streamIndex:(int)videoStreamIndex {
-    
-    if (!formatCtx) { return nil; }
-    if (videoStreamIndex < 0) { return nil; }
-    if (videoStreamIndex >= formatCtx->nb_streams) { return nil; }
-    if (second < 0) { return nil; }
-    if (isfinite(second) == 0) { return nil; }
-    
-    AVCodecContext *codecCtx = avcodec_alloc_context3(NULL);
-    AVStream *stream = formatCtx->streams[videoStreamIndex];
-    AVRational time_base = stream->time_base;
-    AVCodecParameters *parameter = stream->codecpar;
-    
-    avcodec_parameters_to_context(codecCtx, parameter);
-    const AVCodec *codec = avcodec_find_decoder(parameter->codec_id);
-    
-    if (!codec || avcodec_open2(codecCtx, codec, NULL) < 0) { avcodec_free_context(&codecCtx); return nil; }
-
-    int64_t baseTs = (int64_t)(second * AV_TIME_BASE);
-    int64_t timestamp = av_rescale_q(baseTs, (AVRational){1, AV_TIME_BASE}, time_base);
-    
-    av_seek_frame(formatCtx, videoStreamIndex, timestamp, AVSEEK_FLAG_BACKWARD);
-    avcodec_flush_buffers(codecCtx);
-
-    UIImage* image = [self seekFrameAtStreamIndex:videoStreamIndex maxPacketCount:300 formatContext:formatCtx codecContext:codecCtx];
-    return image;
-}
-
-/// 尋找該秒的Frame (畫面)
-/// - Parameters:
-///   - videoStreamIndex: 影片的StreamIndex
-///   - maxPacketCount: 搜尋的最大封包數
-///   - formatCtx: AVFormatContext
-///   - codecCtx: AVCodecContext
-- (UIImage *)seekFrameAtStreamIndex:(int)videoStreamIndex maxPacketCount:(int)maxPacketCount formatContext:(AVFormatContext *)formatCtx codecContext: (AVCodecContext *)codecCtx {
-    
-    AVPacket packet;
-    AVFrame *frame = av_frame_alloc();
-    UIImage *image = nil;
-    
-    for (int index = 0; index < maxPacketCount; index++) {
-        
-        if (av_read_frame(formatCtx, &packet) < 0) { break; }
-
-        if (packet.stream_index == videoStreamIndex) {
-            avcodec_send_packet(codecCtx, &packet);
-
-            while (avcodec_receive_frame(codecCtx, frame) == 0) {
-                image = [self yuvToImage:frame];
-                if (image) { break; }
-            }
-
-            if (image) { break; }
-        }
-
-        av_packet_unref(&packet);
-    }
-
-    avcodec_flush_buffers(codecCtx);
-    av_frame_free(&frame);
-    avcodec_free_context(&codecCtx);
-    
-    return image;
-}
-
-/// 找出哪一條 stream 是視訊，並回傳那條 stream 的 index
-/// - Parameter formatContext: AVFormatContext
-- (int)videoStreamIndexWithFormatContext:(AVFormatContext *)formatContext {
-    
-    for (int index = 0; index < formatContext->nb_streams; index++) {
-        
-        AVStream *stream = formatContext->streams[index];
-        AVCodecParameters *codecpar = stream->codecpar;
-        
-        if (codecpar && codecpar->codec_type == AVMEDIA_TYPE_VIDEO) { return index; }
-    }
-    
-    return -1;
-}
-
-// MARK: - 小工具 (FFMpeg)
-/// 測試影片路徑是否正確 (能不能打開 / 讀不讀得到)
-/// - Parameters:
-///   - url: NSURL
-///   - formatContext: AVFormatContext
-///   - parameters: NSDictionary*
-- (NSError *)checkStreamInputWithURL:(NSURL *)url formatContext:(AVFormatContext **)formatContext parameters:(NSDictionary<NSString *, NSString *> *)parameters {
-    
-    int result = [self openRemoteInputWithContext:formatContext parameters:parameters url:url];
-    if (result < 0) { return [self errorMessageResult:result code:FFmpegVideoErrorOpenFailed]; }
-    
-    result = [self findStreamInformationWithContext:*formatContext];
-    if (result < 0) { return [self errorMessageResult:result code:FFmpegVideoErrorStreamInfoFailed]; }
-    
-    return nil;
-}
-
-/// 將AVFrame => UIImage (bytesPerRow要對齊16的倍數值)
-/// - Parameter frame: AVFrame
-- (UIImage *)yuvToImage:(AVFrame *)frame {
-    
-    struct SwsContext *swsCtx = [self softwareScalerContextWithFrame:frame outputFormat:AV_PIX_FMT_RGBA scalerFlags:SWS_BILINEAR];
-    
-    int rgbSize = av_image_get_buffer_size(AV_PIX_FMT_RGBA, frame->width, frame->height, 1);
-    int rgbLinesize[4] = {frame->width * 4};
-    size_t bytesPerRow = (frame->width * 4 + 15) & ~15;
-    uint8_t *rgbBuffer = av_malloc(rgbSize);
-    uint8_t *rgbPlanes[4] = {rgbBuffer};
-    
-    const uint8_t *const srcData[4] = {frame->data[0], frame->data[1], frame->data[2]};
-    const int srcLinesize[4] = {frame->linesize[0], frame->linesize[1], frame->linesize[2]};
-    
-    sws_scale(swsCtx, srcData, srcLinesize, 0, frame->height, rgbPlanes, rgbLinesize);
-    
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-    
-    CGContextRef cgCtx = CGBitmapContextCreate(rgbBuffer, frame->width, frame->height, 8, bytesPerRow, colorSpace, kCGImageAlphaPremultipliedLast);
-    
-    CGImageRef cgImg = CGBitmapContextCreateImage(cgCtx);
-    UIImage *image = [UIImage imageWithCGImage:cgImg];
-    
-    CGImageRelease(cgImg);
-    CGContextRelease(cgCtx);
-    CGColorSpaceRelease(colorSpace);
-    
-    av_free(rgbBuffer);
-    sws_freeContext(swsCtx);
-    
-    return image;
-}
-
-/// 產生SwsContext
-/// - Parameters:
-///   - frame: AVFrame
-///   - dstFormat: 像素格式
-///   - scalerFlags: 轉換時的插值算法
-- (struct SwsContext *)softwareScalerContextWithFrame:(AVFrame*)frame outputFormat:(enum AVPixelFormat)dstFormat scalerFlags:(int)scalerFlags {
-    enum AVPixelFormat srcFmt = frame->format;
-    return sws_getContext(frame->width, frame->height, srcFmt, frame->width, frame->height, dstFormat, scalerFlags, NULL, NULL, NULL);
-}
-
-/// 產生SwsContext =>  轉成 BGRA，方便塞進 CVPixelBuffer (kCVPixelFormatType_32BGRA)
-/// - Parameters:
-///   - codecContext: AVCodecContext
-///   - dstFormat: 像素格式
-///   - scalerFlags: 轉換時的插值算法
-- (struct SwsContext *)softwareScalerContextWithCodecContext:(AVCodecContext*)codecContext outputFormat:(enum AVPixelFormat)dstFormat scalerFlags:(int)scalerFlags {
-    enum AVPixelFormat srcFmt = codecContext->pix_fmt;
-    return sws_getContext(codecContext->width, codecContext->height, srcFmt, codecContext->width, codecContext->height, dstFormat, scalerFlags, NULL, NULL, NULL);
-}
-
-/// 開啟檔案
-/// - Parameters:
-///   - formatContext: AVFormatContext
-///   - parameters: NSDictionary
-///   - url: NSURL
-- (int)openRemoteInputWithContext:(AVFormatContext**)formatContext parameters:(NSDictionary*)parameters url:(NSURL*)url {
-    
-    AVDictionary *options = [self avDictionaryWithParameters:parameters];
-    int result = avformat_open_input(formatContext, [[url absoluteString] UTF8String], NULL, &options);
-    av_dict_free(&options);
-    
-    return result;
-}
-
-/// 尋找檔案資訊
-/// - Parameter formatContext: AVFormatContext
-- (int)findStreamInformationWithContext:(AVFormatContext*)formatContext {
-    int result = avformat_find_stream_info(formatContext, NULL);
-    return result;
-}
-
-/// 取得影片時間 (CMTime)
-/// - Parameters:
-///   - frame: AVFrame
-///   - stream: AVStream
-- (CMTime)timeFromFrame:(AVFrame *)frame stream:(AVStream *)stream {
-    
-    AVRational timeBase = stream->time_base;
-    int64_t bestTimestamp = frame->best_effort_timestamp;
-    CMTime timeStamp = CMTimeMake(bestTimestamp * timeBase.num, timeBase.den);
-    
-    return timeStamp;
-}
-
-/// 取得影片時間 (Second)
-/// - Parameters:
-///   - frame: AVFrame
-///   - stream: AVFrame
-- (NSTimeInterval)secondFromFrame:(AVFrame *)frame stream:(AVFrame *)stream {
-    CMTime time = [self timeFromFrame:frame stream:stream];
-    return  CMTimeGetSeconds(time);
-}
-
-/// 根據指定的串流的Index及已開啟的 AVFormatContext，建立並開啟對應串流的 AVCodecContext
-/// - Parameters:
-///   - stream: AVStream
-///   - formatContext: AVFormatContext
-- (AVCodecContext *)createCodecContextForStream:(AVStream *)stream formatContext:(AVFormatContext *)formatContext {
-    
-    AVCodecParameters *par = stream->codecpar;
-
-    const AVCodec *codec = avcodec_find_decoder(par->codec_id);
-    if (!codec) { return NULL; }
-
-    AVCodecContext *codecContext = avcodec_alloc_context3(codec);
-    if (!codecContext) { return NULL; }
-
-    if (avcodec_parameters_to_context(codecContext, par) < 0) {
-        avcodec_free_context(&codecContext);
-        return NULL;
-    }
-
-    if (avcodec_open2(codecContext, codec, NULL) < 0) {
-        avcodec_free_context(&codecContext);
-        return NULL;
-    }
-    
-    return codecContext;
-}
-
-/// 設定AVDictionary
-/// - Parameter parameters: NSDictionary *
-- (AVDictionary*)avDictionaryWithParameters:(NSDictionary *)parameters {
-    
-    AVDictionary *options = NULL;
-    
-    for (NSString *key in parameters) {
-        NSString *value = parameters[key];
-        av_dict_set(&options, [key UTF8String], [value UTF8String], 0);
-    }
-    
-    return options;
-}
-
-/// 來源資料緩衝從視訊幀 (YUV → BGRA)
-/// - Parameter frame: AVFrame
-- (FFmpegSrcBuffer)prepareSwsSrcFromFrame:(AVFrame *)frame {
-    
-    FFmpegSrcBuffer buffer = {0};
-    
-    for (int index = 0; index < AV_NUM_DATA_POINTERS; index++) {
-        buffer.slice[index] = frame->data[index];
-        buffer.stride[index] = frame->linesize[index];
-    }
-    
-    return buffer;
-}
-
-/// 建立CVPixelBuffer
-/// - Parameters:
-///   - pixelBuffer: CVPixelBufferRef
-///   - codecContext: AVCodecContext
-- (CVReturn)createPixelBuffer:(CVPixelBufferRef *)pixelBuffer codecContext:(AVCodecContext *)codecContext {
-    
-    NSDictionary *attributes = @{
-        (__bridge NSString *)kCVPixelBufferCGImageCompatibilityKey : @YES,
-        (__bridge NSString *)kCVPixelBufferCGBitmapContextCompatibilityKey : @YES
-    };
-    
-    CVReturn cvReturn = CVPixelBufferCreate(kCFAllocatorDefault, codecContext->width, codecContext->height, kCVPixelFormatType_32BGRA, (__bridge CFDictionaryRef)attributes, pixelBuffer);
-    return cvReturn;
-}
-
-/// 建立CVPixelBuffer (for MetalKit)
-/// - Parameters:
-///   - pixelBuffer: CVPixelBufferRef
-///   - codecContext: AVCodecContext
-- (CVReturn)createMetalPixelBuffer:(CVPixelBufferRef *)pixelBuffer codecContext:(AVCodecContext *)codecContext {
-    
-    NSDictionary *attributes = @{
-        (__bridge NSString *)kCVPixelBufferCGImageCompatibilityKey : @YES,
-        (__bridge NSString *)kCVPixelBufferCGBitmapContextCompatibilityKey : @YES,
-        (__bridge NSString *)kCVPixelBufferMetalCompatibilityKey : @YES
-    };
-    
-    CVReturn cvReturn = CVPixelBufferCreate(kCFAllocatorDefault, codecContext->width, codecContext->height, kCVPixelFormatType_32BGRA, (__bridge CFDictionaryRef)attributes, pixelBuffer);
-    return cvReturn;
-}
-
-/// BGRA → CVPixelBuffer
-/// - Parameters:
-///   - dstBuffer: FFmpegDstBuffer
-///   - pixelBuffer: CVPixelBufferRef
-///   - codecContext: AVCodecContext
-- (void)copyDestinationBuffer:(FFmpegDstBuffer)dstBuffer to:(CVPixelBufferRef)pixelBuffer codecContext:(AVCodecContext *)codecContext {
-    
-    CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-    void *dstBase = CVPixelBufferGetBaseAddress(pixelBuffer);
-    size_t dstBytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer);
-    
-    for (int y = 0; y < codecContext->height; y++) {
-        memcpy((uint8_t *)dstBase + y * dstBytesPerRow, dstBuffer.data[0] + y * dstBuffer.linesize[0], codecContext->width * 4);
-    }
-    
-    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-}
-
-/// CVPixelBuffer => CMSampleBuffer (用 ImageBuffer 建 SampleBuffer)
-/// - Parameters:
-///   - pixelBuffer: CVPixelBufferRef
-///   - sampleBuffer: CMSampleBufferRef
-///   - time: timeStamp
-- (OSStatus)convertPixelBuffer:(CVPixelBufferRef)pixelBuffer to:(CMSampleBufferRef *)sampleBuffer time:(CMTime)timeStamp {
-    
-    if (!pixelBuffer) { return kCMSampleBufferError_RequiredParameterMissing; }
-    if (!sampleBuffer) { return kCMSampleBufferError_RequiredParameterMissing; }
-        
-    CMVideoFormatDescriptionRef formatDesc = NULL;
-    OSStatus status = CMVideoFormatDescriptionCreateForImageBuffer(kCFAllocatorDefault, pixelBuffer, &formatDesc);
-    
-    *sampleBuffer = NULL;
-    
-    if (status != noErr) { return status; }
-    if (!formatDesc) { return status; }
-
-    CMSampleTimingInfo timingInfo = kCMTimingInfoInvalid;
-    timingInfo.presentationTimeStamp = timeStamp;
-    
-    status = CMSampleBufferCreateForImageBuffer(kCFAllocatorDefault, pixelBuffer, true, NULL, NULL, formatDesc, &timingInfo, sampleBuffer);
-    if (formatDesc) { CFRelease(formatDesc); }
-    
-    return status;
-}
-
-// MARK: - 小工具
-/// 產生錯誤訊息
-/// - Parameters:
-///   - message: NSString
-///   - code: FFmpegVideoError
-- (NSError *)errorMessage:(NSString *)message code:(FFmpegVideoError)code {
-
-    NSString *localizedDescription;
-    
-    switch (code) {
-        case FFmpegVideoErrorInvalidURL: localizedDescription = @"Invalid URL"; break;
-        case FFmpegVideoErrorOpenFailed: localizedDescription = @"Could not open stream"; break;
-        case FFmpegVideoErrorStreamInfoFailed: localizedDescription = @"Failed to read stream info"; break;
-        default: localizedDescription = message; break;
-    }
-    
-    NSDictionary* userInfo = @{
-        NSLocalizedDescriptionKey: localizedDescription,
-        @"ffmpegError": message
-    };
-    
-    NSError *error = [NSError errorWithDomain:@"FFmpegVideoErrorDomain" code:code userInfo:userInfo];
-    return error;
-}
-
-/// 產生錯誤訊息 (av_err2str)
-/// - Parameters:
-///   - result: int
-///   - code: FFmpegVideoError
-- (NSError *)errorMessageResult:(int)result code:(FFmpegVideoError)code {
-    NSString *message = [NSString stringWithUTF8String: av_err2str(result)];
-    return [self errorMessage:message code:code];
-}
-
 /// TODO: 播放聲音
 - (void)playPCM:(NSData *)pcmData sampleRate:(int)sampleRate channels:(int)channels {
     [[StreamPlayer shared] playPCM:pcmData sampleRate:sampleRate channels:channels];
@@ -948,7 +587,7 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
     
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         if (decodeCallback) {
-            decodeCallback(formatContext, audioStreamIndex);  // 傳出 context
+            decodeCallback(formatContext, audioStreamIndex);
         }
     });
 }
