@@ -18,6 +18,7 @@
 #include <libavutil/opt.h>
 
 #import "Model.h"
+#import "Utility.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -27,8 +28,6 @@ typedef void (^FFmpegPixelBufferCallback)(CVPixelBufferRef pixelBuffer, CMTime t
 typedef void (^FFmpegFrameWithTimeCallback)(UIImage *frame, CMTime timestamp);
 typedef void (^FFmpegPCMCallback)(NSData *pcmData, int sampleRate, int channels);
 typedef void (^FFmpegDecodeCallback)(AVFormatContext *formatContext, NSInteger audioStreamIndex);
-
-+ (instancetype)shared;
 
 - (NSString *)version;
 - (NSTimeInterval)durationAtURL:(NSURL *)url error:(NSError **)error;
@@ -46,8 +45,9 @@ typedef void (^FFmpegDecodeCallback)(AVFormatContext *formatContext, NSInteger a
 - (void)playRTSPWithURL:(NSURL *)url pixelBuffer:(FFmpegPixelBufferCallback)pixelBufferCallback error:(void (^)(NSError *error))errorCallback completion:(void (^)(BOOL isFinished))completionCallback;
 - (void)stopRTSPPlayWithPixelBuffer;
 
-- (void)decodeAudioStream:(NSURL *)url codecCallback:(void (^)(AVCodecParameters *parameters))codecCallback pcmCallback:(FFmpegPCMCallback)pcmCallback;
+- (void)decodeAudioStream:(NSURL *)url codec:(void (^)(AVCodecParameters *parameters))codecCallback pcm:(FFmpegPCMCallback)pcmCallback error:(void (^)(NSError *error))errorCallback completion:(void (^)(int frameCount))completionCallback;
 - (void)playPCM:(NSData *)pcmData sampleRate:(int)sampleRate channels:(int)channels;
+- (void)stopPCM;
 
 @end
 

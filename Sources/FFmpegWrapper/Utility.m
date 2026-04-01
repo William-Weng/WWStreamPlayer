@@ -21,10 +21,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSError *)checkStreamInputWithURL:(NSURL *)url formatContext:(AVFormatContext **)formatContext parameters:(NSDictionary<NSString *, NSString *> *)parameters {
     
     int result = [self openRemoteInputWithContext:formatContext parameters:parameters url:url];
-    if (result < 0) { return [self errorMessageResult:result code:FFmpegVideoErrorOpenFailed]; }
+    if (result < 0) { return [self errorMessageResult:result code:FFmpegErrorVideoOpenFailed]; }
     
     result = [self findStreamInformationWithContext:*formatContext];
-    if (result < 0) { return [self errorMessageResult:result code:FFmpegVideoErrorStreamInfoFailed]; }
+    if (result < 0) { return [self errorMessageResult:result code:FFmpegErrorVideoStreamInfoFailed]; }
     
     return nil;
 }
@@ -240,15 +240,15 @@ NS_ASSUME_NONNULL_BEGIN
 /// 產生錯誤訊息
 /// - Parameters:
 ///   - message: NSString
-///   - code: FFmpegVideoError
-- (NSError *)errorMessage:(NSString *)message code:(FFmpegVideoError)code {
+///   - code: FFmpegErrorVideo
+- (NSError *)errorMessage:(NSString *)message code:(FFmpegError)code {
 
     NSString *localizedDescription;
     
     switch (code) {
-        case FFmpegVideoErrorInvalidURL: localizedDescription = @"Invalid URL"; break;
-        case FFmpegVideoErrorOpenFailed: localizedDescription = @"Could not open stream"; break;
-        case FFmpegVideoErrorStreamInfoFailed: localizedDescription = @"Failed to read stream info"; break;
+        case FFmpegErrorVideoInvalidURL: localizedDescription = @"Invalid URL"; break;
+        case FFmpegErrorVideoOpenFailed: localizedDescription = @"Could not open stream"; break;
+        case FFmpegErrorVideoStreamInfoFailed: localizedDescription = @"Failed to read stream info"; break;
         default: localizedDescription = message; break;
     }
     
@@ -257,15 +257,15 @@ NS_ASSUME_NONNULL_BEGIN
     [userInfo setValue:localizedDescription forKey:NSLocalizedDescriptionKey];
     [userInfo setValue:message forKey:@"message"];
     
-    NSError *error = [NSError errorWithDomain:@"FFmpegVideoErrorDomain" code:code userInfo:userInfo];
+    NSError *error = [NSError errorWithDomain:@"FFmpegErrorVideoDomain" code:code userInfo:userInfo];
     return error;
 }
 
 /// 產生錯誤訊息 (av_err2str)
 /// - Parameters:
 ///   - result: int
-///   - code: FFmpegVideoError
-- (NSError *)errorMessageResult:(int)result code:(FFmpegVideoError)code {
+///   - code: FFmpegErrorVideo
+- (NSError *)errorMessageResult:(int)result code:(FFmpegError)code {
     NSString *message = [NSString stringWithUTF8String: av_err2str(result)];
     return [self errorMessage:message code:code];
 }

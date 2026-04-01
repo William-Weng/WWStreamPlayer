@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8127DFE02F7CCC0B00618589 /* WWPrint in Frameworks */ = {isa = PBXBuildFile; productRef = 8127DFDF2F7CCC0B00618589 /* WWPrint */; };
 		812E8C192F76845300A649DE /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 812E8C182F76845300A649DE /* WWStreamPlayer */; };
 		812E8C532F768C5000A649DE /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 812E8C522F768C5000A649DE /* WWStreamPlayer */; };
 		8151DAF52F7666B5008E0C2F /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 8151DAF42F7666B5008E0C2F /* WWStreamPlayer */; };
@@ -53,6 +54,7 @@
 				8151DAF52F7666B5008E0C2F /* WWStreamPlayer in Frameworks */,
 				81C8433A2F761B33003804FC /* WWStreamPlayer in Frameworks */,
 				816608B32F7A6D1800AF565C /* WWStreamPlayer in Frameworks */,
+				8127DFE02F7CCC0B00618589 /* WWPrint in Frameworks */,
 				81C8433D2F761BB0003804FC /* WWStreamPlayer in Frameworks */,
 				812E8C192F76845300A649DE /* WWStreamPlayer in Frameworks */,
 			);
@@ -105,6 +107,7 @@
 				812E8C182F76845300A649DE /* WWStreamPlayer */,
 				812E8C522F768C5000A649DE /* WWStreamPlayer */,
 				816608B22F7A6D1800AF565C /* WWStreamPlayer */,
+				8127DFDF2F7CCC0B00618589 /* WWPrint */,
 			);
 			productName = Example;
 			productReference = 817EE1FE2EB1FA050036B57C /* Example.app */;
@@ -136,6 +139,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				816608B12F7A6D1800AF565C /* XCLocalSwiftPackageReference "../../@WWStreamPlayer" */,
+				8127DFDE2F7CCC0B00618589 /* XCRemoteSwiftPackageReference "WWPrint" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 817EE1FF2EB1FA050036B57C /* Products */;
@@ -385,7 +389,23 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		8127DFDE2F7CCC0B00618589 /* XCRemoteSwiftPackageReference "WWPrint" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/William-Weng/WWPrint";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.3.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
+		8127DFDF2F7CCC0B00618589 /* WWPrint */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8127DFDE2F7CCC0B00618589 /* XCRemoteSwiftPackageReference "WWPrint" */;
+			productName = WWPrint;
+		};
 		812E8C182F76845300A649DE /* WWStreamPlayer */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = WWStreamPlayer;

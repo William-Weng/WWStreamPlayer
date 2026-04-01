@@ -11,7 +11,7 @@ https://github.com/user-attachments/assets/89b0ce87-1d83-434a-bed9-9155f2d86908
 ### [Installation with Swift Package Manager](https://medium.com/彼得潘的-swift-ios-app-開發問題解答集/使用-spm-安裝第三方套件-xcode-11-新功能-2c4ffcf85b4b)
 ```bash
 dependencies: [
-    .package(url: "https://github.com/William-Weng/WWStreamPlayer.git", .upToNextMajor(from: "0.5.2"))
+    .package(url: "https://github.com/William-Weng/WWStreamPlayer.git", .upToNextMajor(from: "0.6.0"))
 ]
 ```
 
@@ -26,49 +26,42 @@ dependencies: [
 |play(at:displayLayer:elapseTime:failure:completion:)|播放RTSP串流 (使用AVSampleBufferDisplayLayer)|
 |play(at:pixelBuffer:failure:completion:)|播放RTSP串流 (使用CVPixelBuffer for MetalKit)|
 |stop(for:)|停止播放|
+|playAudio(at:bufferSize:)|播放聲音串流|
+|stopAudio()|停止播放聲音串流|
 
 ### Example
 ```swift
 import UIKit
 import AVFoundation
 import WWStreamPlayer
+import WWPrint
 
 final class ViewController: UIViewController {
-
+    
     @IBOutlet weak var ffmpegVersionLabel: UILabel!
     @IBOutlet weak var videoTimeLabel: UILabel!
     @IBOutlet weak var videoImageView: UIImageView!
-    @IBOutlet weak var layerTimeLabel: UILabel!
-    @IBOutlet weak var layerImageView: UIImageView!
+    
+    private let rtsp = "rtsp://192.168.4.141:8554/mystream"    
+    private let videoPlayer: WWStreamPlayer = .init()
+    private let audioPlayer: WWStreamPlayer = .init()
 
-    private let rtsp = "rtsp://localhost:8554/mystream"
-    private let displayLayer = AVSampleBufferDisplayLayer()
+    private var pcmData: Data = .init()
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        initSetting()
+        ffmepgVersion()
     }
     
     @IBAction func playVideo(_ sender: UIBarButtonItem) {
-        if (sender.tag < 200) { playRtspSteam(at: rtsp); return }
-        playRtspSteam2(at: rtsp);
+        playRtspSteam(at: rtsp)
     }
 }
 
 private extension ViewController {
-    
-    func initSetting() {
         
-        displayLayer.frame = layerImageView.bounds
-        displayLayer.videoGravity = .resizeAspect
-        displayLayer.isOpaque = true;
-        
-        layerImageView.layer.addSublayer(displayLayer)
-        ffmepgVersion()
-    }
-    
     func ffmepgVersion() {
-        let version = WWStreamPlayer.shared.ffmpegVersion()
+        let version = videoPlayer.ffmpegVersion()
         ffmpegVersionLabel.text = "FFMpeg: \(version)"
     }
     
@@ -76,23 +69,14 @@ private extension ViewController {
         
         guard let url = URL(string: urlString) else { return }
         
-        WWStreamPlayer.shared.stop(for: .image)
-
-        WWStreamPlayer.shared.play(at: url) { image, elapseTime in
-            self.videoTimeLabel.text = "\(Int(CMTimeGetSeconds(elapseTime)))"
+        videoPlayer.stop(for: .image)
+        
+        videoPlayer.play(at: url) { image, elapseTime in
+            self.videoTimeLabel.text = "\(CMTimeGetSeconds(elapseTime))"
             self.videoImageView.image = image
         }
-    }
-    
-    func playRtspSteam2(at urlString: String) {
         
-        guard let url = URL(string: urlString) else { return }
-        
-        WWStreamPlayer.shared.stop(for: .displayLayer)
-        
-        WWStreamPlayer.shared.play(at: url, displayLayer: displayLayer, elapseTime: { elapseTime in
-            self.layerTimeLabel.text = "\(Int(CMTimeGetSeconds(elapseTime)))"
-        })
+        audioPlayer.playAudio(at: url)
     }
 }
 ```

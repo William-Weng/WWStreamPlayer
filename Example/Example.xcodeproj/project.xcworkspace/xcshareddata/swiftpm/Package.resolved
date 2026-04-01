@@ -1,0 +1,15 @@
+{
+  "originHash" : "1d9bedabb0e289aa1d4024ae69f7d23f4235733b267b561e500d033e7f6c2c10",
+  "pins" : [
+    {
+      "identity" : "wwprint",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/William-Weng/WWPrint",
+      "state" : {
+        "revision" : "0537185ed59873995a04742a96bfabe9159fcd7b",
+        "version" : "1.3.2"
+      }
+    }
+  ],
+  "version" : 3
+}

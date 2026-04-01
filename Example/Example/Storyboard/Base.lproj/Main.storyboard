@@ -5,6 +5,7 @@
         <deployment identifier="iOS"/>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23721"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="System colors in document resources" minToolsVersion="11.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <scenes>
@@ -32,16 +33,16 @@
                                         <rect key="frame" x="0.0" y="64" width="375" height="604"/>
                                         <subviews>
                                             <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="BHi-WQ-oRT">
-                                                <rect key="frame" x="0.0" y="0.0" width="375" height="302"/>
+                                                <rect key="frame" x="0.0" y="0.0" width="375" height="604"/>
                                                 <subviews>
                                                     <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="awQ-5y-5ot">
-                                                        <rect key="frame" x="0.0" y="0.0" width="375" height="302"/>
+                                                        <rect key="frame" x="0.0" y="0.0" width="375" height="604"/>
                                                     </imageView>
-                                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="&lt;Time&gt;" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="97h-SM-S93">
-                                                        <rect key="frame" x="153.66666666666666" y="262" width="67.666666666666657" height="24"/>
+                                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="&lt;Time&gt;" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="97h-SM-S93">
+                                                        <rect key="frame" x="36" y="559.33333333333337" width="303" height="28.666666666666629"/>
                                                         <color key="backgroundColor" red="0.0" green="0.0" blue="0.0" alpha="0.30160906459999998" colorSpace="custom" customColorSpace="sRGB"/>
-                                                        <fontDescription key="fontDescription" type="system" pointSize="20"/>
-                                                        <color key="textColor" systemColor="groupTableViewBackgroundColor"/>
+                                                        <fontDescription key="fontDescription" type="system" pointSize="24"/>
+                                                        <color key="textColor" systemColor="systemYellowColor"/>
                                                         <nil key="highlightedColor"/>
                                                     </label>
                                                 </subviews>
@@ -53,30 +54,7 @@
                                                     <constraint firstAttribute="trailing" secondItem="awQ-5y-5ot" secondAttribute="trailing" id="ZGp-X6-Pit"/>
                                                     <constraint firstItem="awQ-5y-5ot" firstAttribute="centerY" secondItem="BHi-WQ-oRT" secondAttribute="centerY" id="a1u-Lq-Uoz"/>
                                                     <constraint firstItem="awQ-5y-5ot" firstAttribute="centerX" secondItem="BHi-WQ-oRT" secondAttribute="centerX" id="dgK-rl-dFv"/>
-                                                </constraints>
-                                            </view>
-                                            <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Loj-tA-d1f">
-                                                <rect key="frame" x="0.0" y="302" width="375" height="302"/>
-                                                <subviews>
-                                                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="Fdj-aR-xDP">
-                                                        <rect key="frame" x="0.0" y="0.0" width="375" height="302"/>
-                                                    </imageView>
-                                                    <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="&lt;Time&gt;" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="aX1-cl-Spb">
-                                                        <rect key="frame" x="153.66666666666666" y="262" width="67.666666666666657" height="24"/>
-                                                        <color key="backgroundColor" red="0.0" green="0.0" blue="0.0" alpha="0.3016090645695364" colorSpace="custom" customColorSpace="sRGB"/>
-                                                        <fontDescription key="fontDescription" type="system" pointSize="20"/>
-                                                        <color key="textColor" systemColor="groupTableViewBackgroundColor"/>
-                                                        <nil key="highlightedColor"/>
-                                                    </label>
-                                                </subviews>
-                                                <color key="backgroundColor" white="0.0" alpha="0.0" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
-                                                <constraints>
-                                                    <constraint firstItem="Fdj-aR-xDP" firstAttribute="centerX" secondItem="Loj-tA-d1f" secondAttribute="centerX" id="Fnf-dC-LOK"/>
-                                                    <constraint firstItem="Fdj-aR-xDP" firstAttribute="centerY" secondItem="Loj-tA-d1f" secondAttribute="centerY" id="X6A-et-XVa"/>
-                                                    <constraint firstItem="aX1-cl-Spb" firstAttribute="centerX" secondItem="Loj-tA-d1f" secondAttribute="centerX" id="aLe-up-zQE"/>
-                                                    <constraint firstAttribute="trailing" secondItem="Fdj-aR-xDP" secondAttribute="trailing" id="bXR-Np-hvd"/>
-                                                    <constraint firstAttribute="bottom" secondItem="aX1-cl-Spb" secondAttribute="bottom" constant="16" id="c2R-9g-6OJ"/>
-                                                    <constraint firstItem="Fdj-aR-xDP" firstAttribute="top" secondItem="Loj-tA-d1f" secondAttribute="top" id="reH-wN-XeO"/>
+                                                    <constraint firstAttribute="trailing" secondItem="97h-SM-S93" secondAttribute="trailing" constant="36" id="pKn-Wa-zfg"/>
                                                 </constraints>
                                             </view>
                                         </subviews>
@@ -94,23 +72,14 @@
                         </constraints>
                     </view>
                     <navigationItem key="navigationItem" id="sHa-dY-37T">
-                        <rightBarButtonItems>
-                            <barButtonItem tag="201" image="play.fill" catalog="system" id="Uft-XI-fWq">
-                                <connections>
-                                    <action selector="playVideo:" destination="BYZ-38-t0r" id="ahV-Mx-sAO"/>
-                                </connections>
-                            </barButtonItem>
-                            <barButtonItem tag="101" image="play.fill" catalog="system" id="uue-Gr-kws">
-                                <connections>
-                                    <action selector="playVideo:" destination="BYZ-38-t0r" id="wpc-6M-JgK"/>
-                                </connections>
-                            </barButtonItem>
-                        </rightBarButtonItems>
+                        <barButtonItem key="rightBarButtonItem" tag="201" image="play.fill" catalog="system" id="Uft-XI-fWq">
+                            <connections>
+                                <action selector="playVideo:" destination="BYZ-38-t0r" id="ahV-Mx-sAO"/>
+                            </connections>
+                        </barButtonItem>
                     </navigationItem>
                     <connections>
                         <outlet property="ffmpegVersionLabel" destination="Fb1-Qb-59u" id="vAi-aN-q8i"/>
-                        <outlet property="layerImageView" destination="Fdj-aR-xDP" id="gVM-95-D4b"/>
-                        <outlet property="layerTimeLabel" destination="aX1-cl-Spb" id="4cP-eJ-RXV"/>
                         <outlet property="videoImageView" destination="awQ-5y-5ot" id="QQx-nz-GnA"/>
                         <outlet property="videoTimeLabel" destination="97h-SM-S93" id="zIv-CK-bAP"/>
                     </connections>
@@ -142,6 +111,9 @@
         <image name="play.fill" catalog="system" width="120" height="128"/>
         <systemColor name="groupTableViewBackgroundColor">
             <color red="0.94901960784313721" green="0.94901960784313721" blue="0.96862745098039216" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+        </systemColor>
+        <systemColor name="systemYellowColor">
+            <color red="1" green="0.80000000000000004" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </systemColor>
         <systemColor name="viewFlipsideBackgroundColor">
             <color red="0.12156862745098039" green="0.12941176470588237" blue="0.14117647058823529" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>

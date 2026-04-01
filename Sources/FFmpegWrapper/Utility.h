@@ -12,6 +12,8 @@
 #import <libswscale/swscale.h>
 #import <libavutil/imgutils.h>
 
+#define WWLog(fmt, ...) NSLog((@"\n🚩%@:%d => %s\n\t✅ " fmt), [[NSString stringWithUTF8String: __FILE__] lastPathComponent], __LINE__, __PRETTY_FUNCTION__, ##__VA_ARGS__);
+
 NS_ASSUME_NONNULL_BEGIN
 
 @interface Utility : NSObject
@@ -32,8 +34,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)copyDestinationBuffer:(FFmpegDstBuffer)dstBuffer to:(CVPixelBufferRef)pixelBuffer codecContext:(AVCodecContext *)codecContext;
 
 - (NSError *)checkStreamInputWithURL:(NSURL *)url formatContext:(AVFormatContext *)formatContext parameters:(NSDictionary<NSString *, NSString *> *)parameters;
-- (NSError *)errorMessage:(NSString *)message code:(FFmpegVideoError)code;
-- (NSError *)errorMessageResult:(int)result code:(FFmpegVideoError)code;
+- (NSError *)errorMessage:(NSString *)message code:(FFmpegError)code;
+- (NSError *)errorMessageResult:(int)result code:(FFmpegError)code;
 
 @end
 
