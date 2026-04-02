@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/William-Weng/WWStreamPlayer",
       "state" : {
-        "revision" : "b184ced69c3b27f6be8f8f57a041464b2b7b6802",
-        "version" : "0.6.0"
+        "revision" : "715ab492643639050067ccea517a20e3364020ad",
+        "version" : "0.6.1"
       }
     }
   ],

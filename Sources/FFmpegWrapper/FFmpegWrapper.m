@@ -129,7 +129,7 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
 ///   - frameCallback: 返回畫面 + 時間
 ///   - errorCallback: 返回錯誤
 ///   - completionCallback: 播放完成
-- (void)playRTSPWithURL:(NSURL *)url frame:(FFmpegFrameWithTimeCallback)frameCallback error:(void (^)(NSError *error))errorCallback  completion:(void (^)(BOOL isFinished))completionCallback {
+- (void)playRTSPWithURL:(NSURL *)url frame:(FFmpegFrameWithTimeCallback)frameCallback error:(void (^)(NSError *error))errorCallback completion:(void (^)(BOOL isFinished))completionCallback {
     
     [self getFrameRTSPWithURL:url frame:^(UIImage * _Nonnull frame, CMTime timestamp) {
         dispatch_async(dispatch_get_main_queue(), ^{ frameCallback(frame, timestamp); });
