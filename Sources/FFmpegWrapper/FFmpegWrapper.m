@@ -7,7 +7,7 @@
 
 #import <CoreImage/CoreImage.h>
 #import "FFmpegWrapper.h"
-#import "StreamPlayer.h"
+#import "StreamAudioPlayer.h"
 
 @interface FFmpegWrapper ()
 
@@ -21,7 +21,7 @@
 @property (atomic, assign) BOOL rtspPixelShouldStop;
 
 @property (nonatomic, strong) Utility *util;
-@property (nonatomic, strong) StreamPlayer *audioPlayer;
+@property (nonatomic, strong) StreamAudioPlayer *audioPlayer;
 @property (nonatomic, weak) AVSampleBufferDisplayLayer *currentDisplayLayer;
 @property (nonatomic, copy) FFmpegPixelBufferCallback pixelCallback;
 
@@ -44,7 +44,7 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
     if (self) {
         
         _util = [Utility new];
-        _audioPlayer = [StreamPlayer new];
+        _audioPlayer = [StreamAudioPlayer new];
         
         av_log_set_level(AV_LOG_ERROR);
         avformat_network_init();
@@ -528,235 +528,39 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
     });
 }
 
-// MARK: - 小工具
-/// TODO: 播放聲音
-- (void)playPCM:(NSData *)pcmData sampleRate:(int)sampleRate channels:(int)channels {
-    [[self audioPlayer] playPCM:pcmData sampleRate:sampleRate channels:channels];
+/// 播放PCM
+/// - Parameters:
+///   - pcmData: PCM資料
+///   - sampleRate: 聲音取樣頻率 (22000Hz / 44100Hz)
+///   - channels: 聲音通道數 (單 / 雙通道)
+- (void)playPCM:(NSData *)pcmData sampleRate:(int)sampleRate channels:(int)channels error:(NSError **)error {
+    [[self audioPlayer] playPCM:pcmData sampleRate:sampleRate channels:channels error:error];
 }
 
+/// 停止播放PCM
 - (void)stopPCM {
     [[self audioPlayer] stop];
 }
 
+/// 解析聲音串流
+/// - Parameters:
+///   - url: URL
+///   - codecCallback: AVCodecParameters
+///   - pcmCallback: FFmpegPCMCallback
+///   - errorCallback: Error
+///   - completionCallback: Int
 - (void)decodeAudioStream:(NSURL *)url codec:(void (^)(AVCodecParameters *parameters))codecCallback pcm:(FFmpegPCMCallback)pcmCallback error:(void (^)(NSError *error))errorCallback completion:(void (^)(int frameCount))completionCallback {
     
-    [self findAudioStream:url codecCallback:codecCallback decodeCallback:^(AVFormatContext * _Nonnull formatContext, NSInteger audioStreamIndex) {
-        
-        [self startAudioDecodeLoop:formatContext audioStreamIndex:audioStreamIndex errorCallback:^(NSError *error) {
-            errorCallback(error);
-        } pcmCallback:^(NSData *pcmData, int sampleRate, int channels) {
+    [[self util] findAudioStream:url codecCallback:codecCallback decodeCallback:^(AVFormatContext * _Nonnull formatContext, NSInteger audioStreamIndex) {
+        [[self util] startAudioDecodeLoop:formatContext audioStreamIndex:audioStreamIndex pcmCallback:^(NSData *pcmData, int sampleRate, int channels) {
             pcmCallback(pcmData, sampleRate, channels);
+        } errorCallback:^(NSError *error) {
+            errorCallback(error);
         } completion:^(int frameCount) {
             completionCallback(frameCount);
         }];
     }];
 }
-
-- (void)findAudioStream:(NSURL *)url codecCallback:(void (^)(AVCodecParameters *parameters))codecCallback decodeCallback:(FFmpegDecodeCallback)decodeCallback {
-    
-    AVFormatContext *formatContext = NULL;
-    
-    NSError *error = [[self util] checkStreamInputWithURL:url formatContext:&formatContext parameters:nil];
-    if (error) { return; }
-    
-    int audioStreamIndex = [[self util] streamIndexFromFormatContext:formatContext mediaType:AVMEDIA_TYPE_AUDIO];
-    if (audioStreamIndex < 0) { avformat_close_input(&formatContext); return; }
-    
-    if (codecCallback) {
-        AVStream *audioStream = formatContext->streams[audioStreamIndex];
-        codecCallback(audioStream->codecpar);
-    }
-    
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        if (decodeCallback) { decodeCallback(formatContext, audioStreamIndex); }
-    });
-}
-
-/// 音訊解碼
-/// - Parameters:
-///   - formatContext: AVFormatContext
-///   - audioStreamIndex: NSInteger
-///   - errorCallback: NSError
-///   - pcmCallback: FFmpegPCMCallback
-///   - completionCallback: BOOL
-- (void)startAudioDecodeLoop:(AVFormatContext *)formatContext audioStreamIndex:(NSInteger)audioStreamIndex errorCallback:(void (^)(NSError *error))errorCallback pcmCallback:(FFmpegPCMCallback)pcmCallback completion:(void (^)(int frameCount))completionCallback {
-    
-    __weak typeof(self) weakSelf = self;
-    
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        
-        @autoreleasepool {
-            
-            NSError *error;
-            
-            AVChannelLayout channelLayout = AV_CHANNEL_LAYOUT_STEREO;
-            AVStream *audioStream = formatContext->streams[audioStreamIndex];
-            AVCodecContext *decoderContext = [self audioDecoderContextForStream:audioStream error:&error];
-            if (error) { errorCallback(error); return; }
-            
-            SwrContext *swrContext = [self softwareResampleFromDecoderContext:decoderContext layout:channelLayout error:&error];
-            if (error) { avcodec_free_context(&decoderContext); errorCallback(error); return; }
-            
-            AVPacket *packet = av_packet_alloc();
-            AVFrame *frame = av_frame_alloc();
-            
-            if (!packet || !frame) {
-                NSString* message = [NSString stringWithFormat:@"av_packet_alloc() / av_frame_alloc() failed"];
-                if (error) { error = [[self util] errorMessage:message code:FFmpegErrorAudioAllocFailed]; }
-                [self cleanUpLoopFromPacket:packet frame:frame swrContext:swrContext decoderContext:decoderContext];
-                errorCallback(error);
-                return;
-            }
-
-            int result = -1;
-            int frameCount = 0;
-            
-            while ((result = av_read_frame(formatContext, packet)) >= 0) {
-                
-                if (packet->stream_index != audioStreamIndex) { av_packet_unref(packet); continue; }
-                
-                result = avcodec_send_packet(decoderContext, packet);
-                av_packet_unref(packet);
-                
-                if (result < 0 && result != AVERROR(EAGAIN)) {
-                    if (error) { error = [[self util] errorMessageResult:result code:FFmpegErrorAudioStreamInfoFailed]; }
-                    errorCallback(error);
-                    continue;
-                }
-                
-                while ((result = avcodec_receive_frame(decoderContext, frame)) == 0) {
-
-                    frameCount++;
-                    
-                    int outSamples = swr_get_out_samples(swrContext, frame->nb_samples);
-                    if (outSamples <= 0) { av_frame_unref(frame); continue; }
-                    
-                    int outBufferSize = av_samples_get_buffer_size(NULL, channelLayout.nb_channels, outSamples, AV_SAMPLE_FMT_S16, 1);
-                    if (outBufferSize <= 0) { av_frame_unref(frame); continue; }
-                    
-                    uint8_t *pcmBuffer = av_malloc(outBufferSize);
-                    if (!pcmBuffer) { av_frame_unref(frame); continue; }
-                    
-                    uint8_t *outData[1] = { pcmBuffer };
-                    int convertedSamples = swr_convert(swrContext, outData, outSamples, (const uint8_t **)frame->extended_data, frame->nb_samples);
-                    
-                    if (convertedSamples < 0) {
-                        NSString* message = [NSString stringWithFormat:@"swr_convert() failed"];
-                        if (error) { error = [[self util] errorMessage:message code:FFmpegErrorAudioInvalidURL]; }
-                        av_free(pcmBuffer);
-                        av_frame_unref(frame);
-                        continue;
-                    }
-                    
-                    int pcmSize = av_samples_get_buffer_size(NULL, channelLayout.nb_channels, convertedSamples, AV_SAMPLE_FMT_S16, 1);
-                    
-                    if (pcmCallback && pcmSize > 0) {
-                        NSData *pcmData = [NSData dataWithBytesNoCopy:pcmBuffer length:pcmSize freeWhenDone:NO];
-                        pcmCallback(pcmData, decoderContext->sample_rate, channelLayout.nb_channels);
-                    } else {
-                        av_free(pcmBuffer);
-                    }
-                    
-                    av_frame_unref(frame);
-                }
-                
-                if (result == AVERROR_EOF) { break; }
-            }
-            
-            avcodec_send_packet(decoderContext, NULL);
-            while (avcodec_receive_frame(decoderContext, frame) == 0) { av_frame_unref(frame); }
-            
-            completionCallback(frameCount);
-        }
-    });
-}
-
-// 完整清理（Packet + Frame + SWR + Decoder）
-- (void)cleanUpLoopFromPacket:(AVPacket *)packet frame:(AVFrame *)frame swrContext:(SwrContext *)swrContext decoderContext:(AVCodecContext *)decoderContext {
-    if (packet) { av_packet_free(&packet); }
-    if (frame) { av_frame_free(&frame); }
-    if (swrContext) { swr_free(&swrContext); }
-    if (decoderContext) { avcodec_free_context(&decoderContext); }
-}
-
-/// 初始化解碼器
-/// - Parameters:
-///   - audioStream: AVStream
-///   - error: NSError
-- (AVCodecContext *)audioDecoderContextForStream:(AVStream *)audioStream error:(NSError **)error {
-    
-    AVCodecParameters *codecpar = audioStream->codecpar;
-    
-    // 1. 找解碼器
-    const AVCodec *decoder = avcodec_find_decoder(codecpar->codec_id);
-    if (!decoder) {
-        NSString* message = [NSString stringWithFormat:@"No decoder for codec_id=%d", codecpar->codec_id];
-        if (error) { *error = [[self util] errorMessage:message code:FFmpegErrorAudioDecoderInvalid]; }
-        return nil;
-    }
-    
-    // 2. 分配 context
-    AVCodecContext *decoderContext = avcodec_alloc_context3(decoder);
-    if (!decoderContext) {
-        NSString* message = [NSString stringWithFormat:@"avcodec_alloc_context3() failed"];
-        if (error) { *error = [[self util] errorMessage:message code:FFmpegErrorAudioDecoderInvalid]; }
-        return nil;
-    }
-    
-    // 3. 複製參數
-    if (avcodec_parameters_to_context(decoderContext, codecpar) < 0) {
-        NSString* message = [NSString stringWithFormat:@"avcodec_parameters_to_context() failed"];
-        if (error) { *error = [[self util] errorMessage:message code:FFmpegErrorAudioDecoderInvalid]; }
-        avcodec_free_context(&decoderContext);
-        return nil;
-    }
-    
-    // 4. 開啟解碼器
-    if (avcodec_open2(decoderContext, decoder, NULL) < 0) {
-        NSString* message = [NSString stringWithFormat:@"avcodec_open2() failed"];
-        if (error) { *error = [[self util] errorMessage:message code:FFmpegErrorAudioDecoderInvalid]; }
-        avcodec_free_context(&decoderContext);
-        return nil;
-    }
-    
-    return decoderContext;
-}
-
-/// 初始化 SWR（格式轉換）
-/// - Parameters:
-///   - decoderContext: AVCodecContext
-///   - layout: AVChannelLayout
-///   - error: NSError
-- (SwrContext *)softwareResampleFromDecoderContext:(AVCodecContext *)decoderContext layout:(AVChannelLayout)layout error:(NSError **)error {
-    
-    int result = -1;
-    SwrContext *swrContext = NULL;
-    
-    result = swr_alloc_set_opts2(&swrContext, &layout, AV_SAMPLE_FMT_S16, decoderContext->sample_rate, &decoderContext->ch_layout, decoderContext->sample_fmt, decoderContext->sample_rate, 0, NULL);
-    
-    if (result < 0) {
-        if (error) { *error = [[self util] errorMessageResult:result code:FFmpegErrorAudioSoftwareResampleInvalid]; }
-        swr_free(&swrContext);
-        return NULL;
-    }
-    
-    if (!swrContext) {
-        NSString* message = [NSString stringWithFormat:@"swr_alloc_set_opts2() failed"];
-        if (error) { *error = [[self util] errorMessage:message code:FFmpegErrorAudioSoftwareResampleInvalid]; }
-        swr_free(&swrContext);
-        return NULL;
-    }
-    
-    result = swr_init(swrContext);
-    if (result < 0) {
-        if (error) { *error = [[self util] errorMessageResult:result code:FFmpegErrorAudioSoftwareResampleInvalid]; }
-        swr_free(&swrContext);
-        return NULL;
-    }
-    
-    return swrContext;
-}
-
 
 @end
 

@@ -16,8 +16,7 @@ final class ViewController: UIViewController {
     @IBOutlet weak var videoImageView: UIImageView!
     
     private let rtsp = "rtsp://192.168.4.141:8554/mystream"    
-    private let videoPlayer: WWStreamPlayer = .init()
-    private let audioPlayer: WWStreamPlayer = .init()
+    private let streamPlayer: WWStreamPlayer = .init()
 
     private var pcmData: Data = .init()
     
@@ -36,7 +35,7 @@ private extension ViewController {
         
     /// 取得FFMpeg版本
     func ffmepgVersion() {
-        let version = videoPlayer.ffmpegVersion()
+        let version = streamPlayer.ffmpegVersion()
         ffmpegVersionLabel.text = "FFMpeg: \(version)"
     }
     
@@ -46,13 +45,13 @@ private extension ViewController {
         
         guard let url = URL(string: urlString) else { return }
         
-        videoPlayer.stop(for: .image)
+        streamPlayer.stopVideo(for: .image)
         
-        videoPlayer.play(at: url) { image, elapseTime in
-            self.videoTimeLabel.text = "\(CMTimeGetSeconds(elapseTime))"
-            self.videoImageView.image = image
-        }
+        streamPlayer.playVideo(at: url, frame: { [unowned self] image, elapseTime in
+            videoTimeLabel.text = "\(CMTimeGetSeconds(elapseTime))"
+            videoImageView.image = image
+        })
         
-        audioPlayer.playAudio(at: url)
+        streamPlayer.playAudio(at: url)
     }
 }

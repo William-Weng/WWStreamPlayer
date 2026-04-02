@@ -19,15 +19,11 @@
 
 #import "Model.h"
 #import "Utility.h"
+#import "StreamAudioPlayer.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 @interface FFmpegWrapper : NSObject
-
-typedef void (^FFmpegPixelBufferCallback)(CVPixelBufferRef pixelBuffer, CMTime timestamp);
-typedef void (^FFmpegFrameWithTimeCallback)(UIImage *frame, CMTime timestamp);
-typedef void (^FFmpegPCMCallback)(NSData *pcmData, int sampleRate, int channels);
-typedef void (^FFmpegDecodeCallback)(AVFormatContext *formatContext, NSInteger audioStreamIndex);
 
 - (NSString *)version;
 - (NSTimeInterval)durationAtURL:(NSURL *)url error:(NSError **)error;
@@ -46,7 +42,7 @@ typedef void (^FFmpegDecodeCallback)(AVFormatContext *formatContext, NSInteger a
 - (void)stopRTSPPlayWithPixelBuffer;
 
 - (void)decodeAudioStream:(NSURL *)url codec:(void (^)(AVCodecParameters *parameters))codecCallback pcm:(FFmpegPCMCallback)pcmCallback error:(void (^)(NSError *error))errorCallback completion:(void (^)(int frameCount))completionCallback;
-- (void)playPCM:(NSData *)pcmData sampleRate:(int)sampleRate channels:(int)channels;
+- (void)playPCM:(NSData *)pcmData sampleRate:(int)sampleRate channels:(int)channels error:(NSError **)error;
 - (void)stopPCM;
 
 @end

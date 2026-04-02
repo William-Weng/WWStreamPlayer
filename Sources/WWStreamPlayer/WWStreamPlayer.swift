@@ -8,6 +8,7 @@
 import ObjectiveC
 import FFmpegWrapper
 
+// MARK: - 簡易RSTP播放器
 open class WWStreamPlayer: NSObject {
     
     let ffmpegWrapper = FFmpegWrapper()
@@ -68,7 +69,7 @@ public extension WWStreamPlayer {
     ///   - frameCallback: 返回畫面 + 時間
     ///   - failureCallback: 返回錯誤
     ///   - completionCallback: 播放完成
-    func play(at url: URL, frame frameCallback: @escaping FFmpegFrameWithTimeCallback, failure failureCallback: ((Error) -> Void)? = nil, completion completionCallback: ((Bool) -> Void)? = nil) {
+    func playVideo(at url: URL, frame frameCallback: @escaping FFmpegFrameWithTimeCallback, failure failureCallback: ((Error) -> Void)? = nil, completion completionCallback: ((Bool) -> Void)? = nil) {
         
         ffmpegWrapper.playRTSP(with: url) { frame, timestamp  in
             frameCallback(frame, timestamp)
@@ -86,7 +87,7 @@ public extension WWStreamPlayer {
     ///   - elapseCallback: 時間
     ///   - failureCallback: 返回錯誤
     ///   - completionCallback: 播放完成
-    func play(at url: URL, displayLayer: AVSampleBufferDisplayLayer, elapseTime elapseCallback: ((CMTime) -> Void)? = nil, failure failureCallback: ((Error) -> Void)? = nil, completion completionCallback: ((Bool) -> Void)? = nil) {
+    func playVideo(at url: URL, displayLayer: AVSampleBufferDisplayLayer, elapseTime elapseCallback: ((CMTime) -> Void)? = nil, failure failureCallback: ((Error) -> Void)? = nil, completion completionCallback: ((Bool) -> Void)? = nil) {
         
         ffmpegWrapper.playRTSP(with: url, displayLayer: displayLayer) { time in
             elapseCallback?(time)
@@ -103,7 +104,7 @@ public extension WWStreamPlayer {
     ///   - pixelBufferCallback: 返回CVPixelBufferRef
     ///   - errorCallback: 返回錯誤
     ///   - completionCallback: 播放完成
-    func play(at url: URL, pixelBuffer: @escaping FFmpegPixelBufferCallback, failure failureCallback: ((Error) -> Void)? = nil, completion completionCallback: ((Bool) -> Void)? = nil) {
+    func playVideo(at url: URL, pixelBuffer: @escaping FFmpegPixelBufferCallback, failure failureCallback: ((Error) -> Void)? = nil, completion completionCallback: ((Bool) -> Void)? = nil) {
         
         ffmpegWrapper.playRTSP(with: url, pixelBuffer: pixelBuffer) { error in
             failureCallback?(error)
@@ -114,7 +115,7 @@ public extension WWStreamPlayer {
     
     /// 停止播放
     /// - Parameter type: 播放類型
-    func stop(for type: PlayerType) {
+    func stopVideo(for type: PlayerType) {
         switch type {
         case .image: ffmpegWrapper.stopRTSPPlay()
         case .displayLayer: ffmpegWrapper.stopRTSPPlayOnDisplayLayer()
@@ -128,28 +129,24 @@ public extension WWStreamPlayer {
     
     /// 播放聲音串流
     /// - Parameters:
-    ///   - url: URL
-    ///   - bufferSize: 緩衝區大小
-    func playAudio(at url: URL, bufferSize: Int = 44100 * 2) {
+    ///   - url: 串流網址
+    ///   - bufferSize: 緩衝區大小 (44100 Hz)
+    ///   - result: Result<Bool, Error>
+    func playAudio(at url: URL, bufferSize: Int = 44100 * 2, result: ((Result<Bool, Error>) -> Void)? = nil) {
         
-        decodeAudioStream(at: url) { para in
-            print(para)
-            
-        } pcm: { [weak self] data, sampleRate, channels in
+        decodeAudioStream(at: url) { [weak self] data, sampleRate, channels in
             
             guard let this = self else { return }
             
             this.pcmData.append(data)
-                        
             if (this.pcmData.count < bufferSize) { return }
             
-            this.ffmpegWrapper.playPCM(this.pcmData, sampleRate: sampleRate, channels: channels)
+            switch this.playPCM(this.pcmData, sampleRate: Int(sampleRate), channels: Int(channels)) {
+            case .success(let isSuccess): result?(.success(isSuccess))
+            case .failure(let error): result?(.failure(error))
+            }
+            
             this.pcmData.removeAll()
-            
-        } error: { _ in
-            
-        } completion: { _ in
-            
         }
     }
     
@@ -164,11 +161,18 @@ private extension WWStreamPlayer {
     
     /// 播放PCM (轉成WAV)
     /// - Parameters:
-    ///   - pcm: Data
-    ///   - sampleRate: Int
-    ///   - channels: Int
-    func playPCM(_ pcm: Data, sampleRate: Int, channels: Int) {
-        ffmpegWrapper.playPCM(pcm, sampleRate: Int32(sampleRate), channels: Int32(channels))
+    ///   - pcm: PCM資料
+    ///   - sampleRate: 聲音取樣頻率 (22000Hz / 44100Hz)
+    ///   - channels: 聲音通道數 (單 / 雙通道)
+    /// - Returns: Result<Bool, Error>
+    func playPCM(_ pcm: Data, sampleRate: Int, channels: Int) -> Result<Bool, Error> {
+        
+        var error: NSError? = nil
+        
+        ffmpegWrapper.playPCM(pcm, sampleRate: Int32(sampleRate), channels: Int32(channels), error: &error)
+        
+        if let error { return .failure(error) }
+        return .success(true)
     }
     
     /// 解析聲音串流
@@ -178,24 +182,24 @@ private extension WWStreamPlayer {
     ///   - pcmCallback: FFmpegPCMCallback
     ///   - errorCallback: Error
     ///   - completionCallback: Int
-    func decodeAudioStream(at url: URL, codec codecCallback: @escaping ((AVCodecParameters) -> Void), pcm pcmCallback: @escaping FFmpegPCMCallback, error errorCallback: @escaping((Error) -> Void), completion completionCallback: @escaping ((Int) -> Void)) {
+    func decodeAudioStream(at url: URL, codec codecCallback: ((AVCodecParameters) -> Void)? = nil, pcm pcmCallback: @escaping FFmpegPCMCallback, error errorCallback: ((Error) -> Void)? = nil, completion completionCallback: ((Int) -> Void)? = nil) {
         
         ffmpegWrapper.decodeAudioStream(url) { paramaters in
-            codecCallback(paramaters.pointee)
+            codecCallback?(paramaters.pointee)
         } pcm: { data, sampleRate, channels in
             pcmCallback(data, sampleRate, channels)
         } error: { error in
-            errorCallback(error)
+            errorCallback?(error)
         } completion: { count in
-            completionCallback(Int(count))
+            completionCallback?(Int(count))
         }
     }
     
     /// 串流聲音緩衝區大小
     /// - Parameters:
     ///   - duration: 時間 (秒)
-    ///   - sampleRate: Int
-    ///   - channels: Int
+    ///   - sampleRate: 聲音取樣頻率 (22000Hz / 44100Hz)
+    ///   - channels: 聲音通道數 (單 / 雙通道)
     /// - Returns: Int
     func audioBufferSize(with duration: TimeInterval, sampleRate: Int, channels: Int) -> Int {
         
@@ -204,5 +208,4 @@ private extension WWStreamPlayer {
         
         return bufferSize
     }
-
 }

@@ -11,7 +11,7 @@ https://github.com/user-attachments/assets/70ef120a-bd2b-4c10-9fad-c507abd9891d
 ### [Installation with Swift Package Manager](https://medium.com/彼得潘的-swift-ios-app-開發問題解答集/使用-spm-安裝第三方套件-xcode-11-新功能-2c4ffcf85b4b)
 ```bash
 dependencies: [
-    .package(url: "https://github.com/William-Weng/WWStreamPlayer.git", .upToNextMajor(from: "0.6.0"))
+    .package(url: "https://github.com/William-Weng/WWStreamPlayer.git", .upToNextMajor(from: "0.6.1"))
 ]
 ```
 
@@ -22,19 +22,15 @@ dependencies: [
 |duration(at:)|取得本地端影片長度|
 |frame(at:second:)|取得本地端影音該時段的畫面|
 |thumbnails(at:count:)|產生本地端影音縮圖 (平均時間)|
-|play(at:frame:failure:completion:)|播放RTSP串流 (使用frame圖片)|
-|play(at:displayLayer:elapseTime:failure:completion:)|播放RTSP串流 (使用AVSampleBufferDisplayLayer)|
-|play(at:pixelBuffer:failure:completion:)|播放RTSP串流 (使用CVPixelBuffer for MetalKit)|
-|stop(for:)|停止播放|
-|playAudio(at:bufferSize:)|播放聲音串流|
+|playVideo(at:frame:failure:completion:)|播放RTSP串流 (使用frame圖片)|
+|playVideo(at:displayLayer:elapseTime:failure:completion:)|播放RTSP串流 (使用AVSampleBufferDisplayLayer)|
+|playVideo(at:pixelBuffer:failure:completion:)|播放RTSP串流 (使用CVPixelBuffer for MetalKit)|
+|stopVideo(for:)|停止播放|
+|playAudio(at:bufferSize:result:)|播放聲音串流|
 |stopAudio()|停止播放聲音串流|
 
 ### Example
 ```swift
-import UIKit
-import AVFoundation
-import WWStreamPlayer
-
 final class ViewController: UIViewController {
     
     @IBOutlet weak var ffmpegVersionLabel: UILabel!
@@ -42,8 +38,7 @@ final class ViewController: UIViewController {
     @IBOutlet weak var videoImageView: UIImageView!
     
     private let rtsp = "rtsp://192.168.4.141:8554/mystream"    
-    private let videoPlayer: WWStreamPlayer = .init()
-    private let audioPlayer: WWStreamPlayer = .init()
+    private let streamPlayer: WWStreamPlayer = .init()
 
     private var pcmData: Data = .init()
     
@@ -60,7 +55,7 @@ final class ViewController: UIViewController {
 private extension ViewController {
         
     func ffmepgVersion() {
-        let version = videoPlayer.ffmpegVersion()
+        let version = streamPlayer.ffmpegVersion()
         ffmpegVersionLabel.text = "FFMpeg: \(version)"
     }
     
@@ -68,14 +63,14 @@ private extension ViewController {
         
         guard let url = URL(string: urlString) else { return }
         
-        videoPlayer.stop(for: .image)
+        streamPlayer.stopVideo(for: .image)
         
-        videoPlayer.play(at: url) { image, elapseTime in
-            self.videoTimeLabel.text = "\(CMTimeGetSeconds(elapseTime))"
-            self.videoImageView.image = image
-        }
+        streamPlayer.playVideo(at: url, frame: { [unowned self] image, elapseTime in
+            videoTimeLabel.text = "\(CMTimeGetSeconds(elapseTime))"
+            videoImageView.image = image
+        })
         
-        audioPlayer.playAudio(at: url)
+        streamPlayer.playAudio(at: url)
     }
 }
 ```

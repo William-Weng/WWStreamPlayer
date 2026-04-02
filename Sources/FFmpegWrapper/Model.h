@@ -10,6 +10,12 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+typedef void (^FFmpegPixelBufferCallback)(CVPixelBufferRef pixelBuffer, CMTime timestamp);
+typedef void (^FFmpegFrameWithTimeCallback)(UIImage *frame, CMTime timestamp);
+typedef void (^FFmpegPCMCallback)(NSData *pcmData, int sampleRate, int channels);
+typedef void (^FFmpegDecodeCallback)(AVFormatContext *formatContext, NSInteger audioStreamIndex);
+typedef void (^FFmpegPCMCallback)(NSData *pcmData, int sampleRate, int channels);
+
 typedef NS_ENUM(NSInteger, FFmpegError) {
     FFmpegErrorVideoInvalidURL,
     FFmpegErrorVideoOpenFailed,
