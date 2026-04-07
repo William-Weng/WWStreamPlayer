@@ -338,11 +338,11 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
         AVCodecContext *codecContext = [[this util] createCodecContextForStream:stream formatContext: formatContext];
         if (codecContext == NULL) { return; }
         
-        enum AVPixelFormat pixelFormat = AV_PIX_FMT_BGRA;
-        struct SwsContext *swsContext = [[this util] softwareScalerContextWithCodecContext:codecContext outputFormat:pixelFormat scalerFlags:SWS_BILINEAR];
-        
         AVPacket *packet = av_packet_alloc();
         AVFrame *frame = av_frame_alloc();
+        
+        enum AVPixelFormat pixelFormat = AV_PIX_FMT_BGRA;
+        struct SwsContext *swsContext = [[this util] softwareScalerContextWithCodecContext:codecContext outputFormat:pixelFormat scalerFlags:SWS_BILINEAR];
         
         FFmpegDstBuffer dstBuffer = {0};
         int result = av_image_alloc(dstBuffer.data, dstBuffer.linesize, codecContext->width, codecContext->height, pixelFormat, 1);
@@ -443,12 +443,12 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
         AVStream* stream = formatContext->streams[videoStreamIndex];
         AVCodecContext *codecContext = [[this util] createCodecContextForStream:stream formatContext: formatContext];
         if (codecContext == NULL) { return; }
+                
+        AVPacket *packet = av_packet_alloc();
+        AVFrame *frame = av_frame_alloc();
         
         enum AVPixelFormat pixelFormat = AV_PIX_FMT_BGRA;
         struct SwsContext *swsContext = [[this util] softwareScalerContextWithCodecContext:codecContext outputFormat:pixelFormat scalerFlags:SWS_BILINEAR];
-        
-        AVPacket *packet = av_packet_alloc();
-        AVFrame *frame = av_frame_alloc();
         
         FFmpegDstBuffer dstBuffer = {0};
         int result = av_image_alloc(dstBuffer.data, dstBuffer.linesize, codecContext->width, codecContext->height, pixelFormat, 1);
@@ -458,8 +458,6 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
             av_freep(&dstBuffer.data[0]);
             return;
         }
-        
-        AVRational timeBase = stream->time_base;
         
         while (av_read_frame(formatContext, packet) >= 0) {
             
