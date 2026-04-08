@@ -11,7 +11,9 @@ import FFmpegWrapper
 // MARK: - 簡易RSTP播放器
 open class WWStreamPlayer: NSObject {
     
-    let ffmpegWrapper = FFmpegWrapper()
+    let ffmpegWrapper: FFmpegWrapper = .init()
+    let audioPlayer: AudioPlayer = .init()
+    
     var pcmData: Data = .init()
 }
 
@@ -141,39 +143,28 @@ public extension WWStreamPlayer {
             this.pcmData.append(data)
             if (this.pcmData.count < bufferSize) { return }
             
-            switch this.playPCM(this.pcmData, sampleRate: Int(sampleRate), channels: Int(channels)) {
-            case .success(let isSuccess): result?(.success(isSuccess))
-            case .failure(let error): result?(.failure(error))
+            Task(priority: .userInitiated) {
+                do {
+                    let isSuccess = try await this.audioPlayer.playPCM(this.pcmData, sampleRate: Int(sampleRate), channels: Int(channels))
+                    this.pcmData.removeAll()
+                    result?(.success(isSuccess))
+                } catch {
+                    result?(.failure(error))
+                }
             }
-            
-            this.pcmData.removeAll()
         }
     }
     
     /// 停止播放聲音串流
     func stopAudio() {
-        ffmpegWrapper.stopPCM()
+        Task(priority: .userInitiated) {
+            try await audioPlayer.stopPCM()
+        }
     }
 }
 
 // MARK: - 小工具
 private extension WWStreamPlayer {
-    
-    /// 播放PCM (轉成WAV)
-    /// - Parameters:
-    ///   - pcm: PCM資料
-    ///   - sampleRate: 聲音取樣頻率 (22000Hz / 44100Hz)
-    ///   - channels: 聲音通道數 (單 / 雙通道)
-    /// - Returns: Result<Bool, Error>
-    func playPCM(_ pcm: Data, sampleRate: Int, channels: Int) -> Result<Bool, Error> {
-        
-        var error: NSError? = nil
-        
-        ffmpegWrapper.playPCM(pcm, sampleRate: Int32(sampleRate), channels: Int32(channels), error: &error)
-        
-        if let error { return .failure(error) }
-        return .success(true)
-    }
     
     /// 解析聲音串流
     /// - Parameters:

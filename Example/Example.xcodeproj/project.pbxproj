@@ -10,11 +10,12 @@
 		812E8C192F76845300A649DE /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 812E8C182F76845300A649DE /* WWStreamPlayer */; };
 		812E8C532F768C5000A649DE /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 812E8C522F768C5000A649DE /* WWStreamPlayer */; };
 		8151DAF52F7666B5008E0C2F /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 8151DAF42F7666B5008E0C2F /* WWStreamPlayer */; };
+		81585BF52F85E4620009F0AB /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 81585BF42F85E4620009F0AB /* WWStreamPlayer */; };
+		81585BF82F85F7710009F0AB /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 81585BF72F85F7710009F0AB /* WWStreamPlayer */; };
 		816608B32F7A6D1800AF565C /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 816608B22F7A6D1800AF565C /* WWStreamPlayer */; };
 		817A16162F7E209900E6692E /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 817A16152F7E209900E6692E /* WWStreamPlayer */; };
 		817A164E2F7E4F7A00E6692E /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 817A164D2F7E4F7A00E6692E /* WWStreamPlayer */; };
 		817CF2E32F8492D100E39F65 /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 817CF2E22F8492D100E39F65 /* WWStreamPlayer */; };
-		817CF2E62F84966700E39F65 /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 817CF2E52F84966700E39F65 /* WWStreamPlayer */; };
 		81C843372F7619C8003804FC /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 81C843362F7619C8003804FC /* WWStreamPlayer */; };
 		81C8433A2F761B33003804FC /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 81C843392F761B33003804FC /* WWStreamPlayer */; };
 		81C8433D2F761BB0003804FC /* WWStreamPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = 81C8433C2F761BB0003804FC /* WWStreamPlayer */; };
@@ -56,7 +57,8 @@
 				812E8C532F768C5000A649DE /* WWStreamPlayer in Frameworks */,
 				81C843402F761D27003804FC /* WWStreamPlayer in Frameworks */,
 				8151DAF52F7666B5008E0C2F /* WWStreamPlayer in Frameworks */,
-				817CF2E62F84966700E39F65 /* WWStreamPlayer in Frameworks */,
+				81585BF82F85F7710009F0AB /* WWStreamPlayer in Frameworks */,
+				81585BF52F85E4620009F0AB /* WWStreamPlayer in Frameworks */,
 				81C8433A2F761B33003804FC /* WWStreamPlayer in Frameworks */,
 				816608B32F7A6D1800AF565C /* WWStreamPlayer in Frameworks */,
 				81C8433D2F761BB0003804FC /* WWStreamPlayer in Frameworks */,
@@ -116,7 +118,8 @@
 				817A16152F7E209900E6692E /* WWStreamPlayer */,
 				817A164D2F7E4F7A00E6692E /* WWStreamPlayer */,
 				817CF2E22F8492D100E39F65 /* WWStreamPlayer */,
-				817CF2E52F84966700E39F65 /* WWStreamPlayer */,
+				81585BF42F85E4620009F0AB /* WWStreamPlayer */,
+				81585BF72F85F7710009F0AB /* WWStreamPlayer */,
 			);
 			productName = Example;
 			productReference = 817EE1FE2EB1FA050036B57C /* Example.app */;
@@ -147,7 +150,7 @@
 			mainGroup = 817EE1F52EB1FA050036B57C;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				817CF2E42F84966700E39F65 /* XCRemoteSwiftPackageReference "WWStreamPlayer" */,
+				81585BF62F85F7710009F0AB /* XCRemoteSwiftPackageReference "WWStreamPlayer" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 817EE1FF2EB1FA050036B57C /* Products */;
@@ -391,11 +394,11 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		817CF2E42F84966700E39F65 /* XCRemoteSwiftPackageReference "WWStreamPlayer" */ = {
+		81585BF62F85F7710009F0AB /* XCRemoteSwiftPackageReference "WWStreamPlayer" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/William-Weng/WWStreamPlayer";
 			requirement = {
-				kind = upToNextMajorVersion;
+				kind = upToNextMinorVersion;
 				minimumVersion = 0.6.1;
 			};
 		};
@@ -414,6 +417,15 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = WWStreamPlayer;
 		};
+		81585BF42F85E4620009F0AB /* WWStreamPlayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = WWStreamPlayer;
+		};
+		81585BF72F85F7710009F0AB /* WWStreamPlayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 81585BF62F85F7710009F0AB /* XCRemoteSwiftPackageReference "WWStreamPlayer" */;
+			productName = WWStreamPlayer;
+		};
 		816608B22F7A6D1800AF565C /* WWStreamPlayer */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = WWStreamPlayer;
@@ -428,11 +440,6 @@
 		};
 		817CF2E22F8492D100E39F65 /* WWStreamPlayer */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = WWStreamPlayer;
-		};
-		817CF2E52F84966700E39F65 /* WWStreamPlayer */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 817CF2E42F84966700E39F65 /* XCRemoteSwiftPackageReference "WWStreamPlayer" */;
 			productName = WWStreamPlayer;
 		};
 		81C843362F7619C8003804FC /* WWStreamPlayer */ = {

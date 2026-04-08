@@ -7,7 +7,6 @@
 
 #import <CoreImage/CoreImage.h>
 #import "FFmpegWrapper.h"
-#import "StreamAudioPlayer.h"
 
 @interface FFmpegWrapper ()
 
@@ -21,7 +20,6 @@
 @property (atomic, assign) BOOL rtspPixelShouldStop;
 
 @property (nonatomic, strong) Utility *util;
-@property (nonatomic, strong) StreamAudioPlayer *audioPlayer;
 @property (nonatomic, weak) AVSampleBufferDisplayLayer *currentDisplayLayer;
 @property (nonatomic, copy) FFmpegPixelBufferCallback pixelCallback;
 
@@ -44,7 +42,6 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
     if (self) {
         
         _util = [Utility new];
-        _audioPlayer = [StreamAudioPlayer new];
         
         av_log_set_level(AV_LOG_ERROR);
         avformat_network_init();
@@ -524,20 +521,6 @@ typedef NS_ENUM(NSInteger, FFmpegStreamType) {
         
         completionCallback(true);
     });
-}
-
-/// 播放PCM
-/// - Parameters:
-///   - pcmData: PCM資料
-///   - sampleRate: 聲音取樣頻率 (22000Hz / 44100Hz)
-///   - channels: 聲音通道數 (單 / 雙通道)
-- (void)playPCM:(NSData *)pcmData sampleRate:(int)sampleRate channels:(int)channels error:(NSError **)error {
-    [[self audioPlayer] playPCM:pcmData sampleRate:sampleRate channels:channels error:error];
-}
-
-/// 停止播放PCM
-- (void)stopPCM {
-    [[self audioPlayer] stop];
 }
 
 /// 解析聲音串流

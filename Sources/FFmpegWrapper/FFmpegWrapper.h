@@ -19,7 +19,6 @@
 
 #import "Model.h"
 #import "Utility.h"
-#import "StreamAudioPlayer.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -42,8 +41,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)stopRTSPPlayWithPixelBuffer;
 
 - (void)decodeAudioStream:(NSURL *)url codec:(void (^)(AVCodecParameters *parameters))codecCallback pcm:(FFmpegPCMCallback)pcmCallback error:(void (^)(NSError *error))errorCallback completion:(void (^)(int frameCount))completionCallback;
-- (void)playPCM:(NSData *)pcmData sampleRate:(int)sampleRate channels:(int)channels error:(NSError **)error;
-- (void)stopPCM;
 
 @end
 

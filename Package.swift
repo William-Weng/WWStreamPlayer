@@ -11,10 +11,13 @@ let package = Package(
     products: [
         .library(name: "WWStreamPlayer", targets: ["WWStreamPlayer"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/William-Weng/WWWavWriter", .upToNextMinor(from: "1.1.0"))
+    ],
     targets: [
         .target(
             name: "WWStreamPlayer",
-            dependencies: ["FFmpegWrapper"],
+            dependencies: ["FFmpegWrapper", "WWWavWriter"],
             resources: [.copy("Privacy")]
         ),
         .target(
