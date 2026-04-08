@@ -454,7 +454,8 @@ NS_ASSUME_NONNULL_BEGIN
                     int pcmSize = av_samples_get_buffer_size(NULL, channelLayout.nb_channels, convertedSamples, AV_SAMPLE_FMT_S16, 1);
                     
                     if (pcmCallback && pcmSize > 0) {
-                        NSData *pcmData = [NSData dataWithBytesNoCopy:pcmBuffer length:pcmSize freeWhenDone:NO];
+                        NSData *pcmData = [NSData dataWithBytesNoCopy:pcmBuffer length:pcmSize];
+                        av_free(pcmBuffer);
                         pcmCallback(pcmData, decoderContext->sample_rate, channelLayout.nb_channels);
                     } else {
                         av_free(pcmBuffer);
