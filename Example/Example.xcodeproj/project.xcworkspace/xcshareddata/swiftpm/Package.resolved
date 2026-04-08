@@ -6,8 +6,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/William-Weng/WWStreamPlayer",
       "state" : {
-        "revision" : "715ab492643639050067ccea517a20e3364020ad",
-        "version" : "0.6.1"
+        "revision" : "e4cec328c6d7a0da81870222ca5621eefd83a765",
+        "version" : "0.6.2"
+      }
+    },
+    {
+      "identity" : "wwwavwriter",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/William-Weng/WWWavWriter",
+      "state" : {
+        "revision" : "503304723a6d97698294d634b1785fdc4cd7bc85",
+        "version" : "1.1.0"
       }
     }
   ],
